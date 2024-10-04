@@ -20,7 +20,7 @@ func main() {
 	registry := e.NewRegistry()
 	ext := e.NewExtension("openshift", "framework", "default")
 	ext.AddSuite(e.Suite{
-		Name: "framework",
+		Name: "openshift-tests-extension/framework",
 	})
 
 	// If using Ginkgo, build test specs automatically

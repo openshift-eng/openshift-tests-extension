@@ -39,7 +39,7 @@ func (specs ExtensionTestSpecs) Names() []string {
 	return names
 }
 
-func (specs ExtensionTestSpecs) Run(w *ResultWriter, maxConcurrent int) error {
+func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
 	queue := make(chan *ExtensionTestSpec)
 	failures := atomic.Int64{}
 

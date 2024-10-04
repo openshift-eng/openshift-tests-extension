@@ -2,9 +2,104 @@ package extensiontests
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
+	"os"
+	"sync"
+
+	"github.com/openshift-eng/openshift-tests-extension/pkg/junit"
 )
+
+// ResultWriter is an interface for recording ExtensionTestResults in a particular format.
+// Implementations must be threadsafe.
+type ResultWriter interface {
+	Write(*ExtensionTestResult)
+	Flush() error
+}
+
+type CompositeResultWriter struct {
+	writers []ResultWriter
+}
+
+func NewCompositeResultWriter(writers ...ResultWriter) *CompositeResultWriter {
+	return &CompositeResultWriter{
+		writers: writers,
+	}
+}
+
+func (w *CompositeResultWriter) AddWriter(writer ResultWriter) {
+	w.writers = append(w.writers, writer)
+}
+
+func (w *CompositeResultWriter) Write(res *ExtensionTestResult) {
+	for _, writer := range w.writers {
+		writer.Write(res)
+	}
+}
+
+func (w *CompositeResultWriter) Flush() error {
+	var errs []error
+	for _, writer := range w.writers {
+		if err := writer.Flush(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("encountered errors from writers: %v", errs)
+	}
+
+	return nil
+}
+
+type JUnitResultWriter struct {
+	lock      sync.Mutex
+	testSuite *junit.TestSuite
+	out       *os.File
+	suiteName string
+	path      string
+	results   ExtensionTestResults
+}
+
+func NewJUnitResultWriter(path, suiteName string) (ResultWriter, error) {
+	file, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &JUnitResultWriter{
+		testSuite: &junit.TestSuite{
+			Name: suiteName,
+		},
+		out:       file,
+		suiteName: suiteName,
+		path:      path,
+	}, nil
+}
+
+func (w *JUnitResultWriter) Write(res *ExtensionTestResult) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.results = append(w.results, res)
+}
+
+func (w *JUnitResultWriter) Flush() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	data, err := xml.Marshal(w.results.ToJUnit(w.suiteName))
+	if err != nil {
+		panic(err)
+	}
+	if _, err := w.out.Write(data); err != nil {
+		return err
+	}
+	if err := w.out.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 type ResultFormat string
 
@@ -13,13 +108,14 @@ var (
 	JSONL ResultFormat = "jsonl"
 )
 
-type ResultWriter struct {
+type JSONResultWriter struct {
+	lock    sync.Mutex
 	out     io.Writer
 	format  ResultFormat
 	results ExtensionTestResults
 }
 
-func NewResultWriter(out io.Writer, format ResultFormat) (*ResultWriter, error) {
+func NewJSONResultWriter(out io.Writer, format ResultFormat) (*JSONResultWriter, error) {
 	switch format {
 	case JSON, JSONL:
 	// do nothing
@@ -27,13 +123,15 @@ func NewResultWriter(out io.Writer, format ResultFormat) (*ResultWriter, error) 
 		return nil, fmt.Errorf("unsupported result format: %s", format)
 	}
 
-	return &ResultWriter{
+	return &JSONResultWriter{
 		out:    out,
 		format: format,
 	}, nil
 }
 
-func (w *ResultWriter) Write(result *ExtensionTestResult) {
+func (w *JSONResultWriter) Write(result *ExtensionTestResult) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
 	switch w.format {
 	case JSONL:
 		// JSONL gets written to out as we get the items
@@ -47,15 +145,20 @@ func (w *ResultWriter) Write(result *ExtensionTestResult) {
 	}
 }
 
-func (w *ResultWriter) Flush() {
+func (w *JSONResultWriter) Flush() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
 	switch w.format {
 	case JSONL:
 	// we already wrote it out
 	case JSON:
 		data, err := json.MarshalIndent(w.results, "", "  ")
 		if err != nil {
-			panic(err)
+			return err
 		}
-		fmt.Fprintf(w.out, "%s\n", string(data))
+		_, err = w.out.Write(data)
+		return err
 	}
+
+	return nil
 }
