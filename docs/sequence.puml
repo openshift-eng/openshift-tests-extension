@@ -1,0 +1,66 @@
+@startuml
+title External Test Binary : Run Suite Sequence Diagram
+
+actor "User" as user
+participant "openshift-tests"
+participant "Release payload"
+
+box "Test Extension Binaries" #LightBlue
+    participant "k8s-tests"
+    participant "cvo-tests"
+    participant "anybodys-tests"
+end box
+
+user -> "openshift-tests" : run suite
+
+"openshift-tests" -> "openshift-tests" : Lookup test binaries from registry
+
+par
+"openshift-tests" <- "Release payload" : Extract/decompress test binaries
+end
+
+par
+"openshift-tests" -> "k8s-tests" : Execute "info" subcommand
+"openshift-tests" <- "k8s-tests" : API Version, Extension Information, Suites, etc.
+else
+"openshift-tests" -> "cvo-tests" : Execute "info" subcommand
+"openshift-tests" <- "cvo-tests" : API Version, Extension Information, Suites, etc.
+else
+"openshift-tests" -> "anybodys-tests" : Execute "info" subcommand
+"openshift-tests" <- "anybodys-tests" : API Version, Extension Information, Suites, etc.
+end
+
+"openshift-tests" -> "openshift-tests" : Register available extensions and suites
+
+par
+"openshift-tests" -> "k8s-tests" : Discover and list tests (passing environment - platform, arch, etc)
+"k8s-tests" -> "k8s-tests" : Filter tests by environment
+"k8s-tests" -> "openshift-tests" : Filtered ExtensionTestSpecs (including resource requirements)
+else
+"openshift-tests" -> "cvo-tests" : Discover and list tests (passing environment - platform, arch, etc)
+"cvo-tests" -> "cvo-tests" : Filter tests by environment
+"cvo-tests" -> "openshift-tests" : Filtered ExtensionTestSpecs (including resource requirements)
+else
+"openshift-tests" -> "anybodys-tests" : Discover and list tests (passing environment - platform, arch, etc)
+"anybodys-tests" -> "anybodys-tests" : Filter tests by environment
+"anybodys-tests" -> "openshift-tests" : Filtered ExtensionTestSpecs (including resource requirements)
+end
+
+"openshift-tests" -> "openshift-tests" : Parse resource requests (CPU, memory, isolation)
+"openshift-tests" -> "openshift-tests" : Plan test execution based on available resources
+
+par
+"openshift-tests" -> "k8s-tests" : Run tests according to execution plan
+"k8s-tests" -> "openshift-tests" : ExtensionTestResults
+else
+"openshift-tests" -> "cvo-tests" : Run tests according to execution plan
+"cvo-tests" -> "openshift-tests" : ExtensionTestResults
+else
+"openshift-tests" -> "anybodys-tests" : Run tests according to execution plan
+"anybodys-tests" -> "openshift-tests" : ExtensionTestResults
+end
+
+
+"openshift-tests" -> "user" : Aggregate and report all test results
+
+@enduml
