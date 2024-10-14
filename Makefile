@@ -17,10 +17,16 @@ verify: lint
 build: example-tests framework-tests
 
 example-tests:
-	go build -ldflags "$(LDFLAGS)" ./cmd/example-tests/...
+	# GO_COMPLIANCE_POLICY="exempt_all" must only be used for test related binaries.
+	# It prevents various FIPS compliance policies from being applied to this compilation.
+	# Do not set globally.
+	GO_COMPLIANCE_POLICY="exempt_all" go build -ldflags "$(LDFLAGS)" ./cmd/example-tests/...
 
 framework-tests:
-	go build -ldflags "$(LDFLAGS)" ./cmd/framework-tests/...
+	# GO_COMPLIANCE_POLICY="exempt_all" must only be used for test related binaries.
+	# It prevents various FIPS compliance policies from being applied to this compilation.
+	# Do not set globally.
+	GO_COMPLIANCE_POLICY="exempt_all" go build -ldflags "$(LDFLAGS)" ./cmd/framework-tests/...
 
 test: unit integration
 
