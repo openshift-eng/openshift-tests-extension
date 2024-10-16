@@ -71,7 +71,7 @@ func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
 			defer wg.Done()
 			for spec := range queue {
 				for _, beforeEachTask := range spec.beforeEach {
-					beforeEachTask.Run()
+					beforeEachTask.Run(*spec)
 				}
 
 				res := runSpec(spec)
@@ -80,7 +80,7 @@ func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
 				}
 
 				for _, afterEachTask := range spec.afterEach {
-					afterEachTask.Run()
+					afterEachTask.Run(res)
 				}
 				w.Write(res)
 			}
@@ -120,19 +120,20 @@ func (specs ExtensionTestSpecs) AddAfterAll(fn func()) {
 	})
 }
 
-// AddBeforeEach adds a function that runs before each test starts executing. This function
-// must be thread safe!
-func (specs ExtensionTestSpecs) AddBeforeEach(fn func()) {
-	task := &RepeatableTask{fn: fn}
+// AddBeforeEach adds a function that runs before each test starts executing. The ExtensionTestSpec is
+// passed in for contextual information, but must not be modified. The provided function must be thread
+// safe.
+func (specs ExtensionTestSpecs) AddBeforeEach(fn func(spec ExtensionTestSpec)) {
+	task := &SpecTask{fn: fn}
 	specs.Walk(func(spec *ExtensionTestSpec) {
 		spec.beforeEach = append(spec.beforeEach, task)
 	})
 }
 
-// AddAfterEach adds a function that runs after each test has finished executing. This function
-// must be thread safe!
-func (specs ExtensionTestSpecs) AddAfterEach(fn func()) {
-	task := &RepeatableTask{fn: fn}
+// AddAfterEach adds a function that runs after each test has finished executing. The ExtensionTestResult
+// can be modified if needed. The provided function must be thread safe.
+func (specs ExtensionTestSpecs) AddAfterEach(fn func(task *ExtensionTestResult)) {
+	task := &TestResultTask{fn: fn}
 	specs.Walk(func(spec *ExtensionTestSpec) {
 		spec.afterEach = append(spec.afterEach, task)
 	})

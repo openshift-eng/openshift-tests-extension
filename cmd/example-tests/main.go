@@ -53,21 +53,30 @@ func main() {
 		panic(fmt.Sprintf("couldn't build extension test specs from ginkgo: %+v", err.Error()))
 	}
 
-	// You can add hooks to run before/after tests. "Each" functions must
-	// be thread safe.
+	// You can add hooks to run before/after tests. There are BeforeEach, BeforeAll, AfterEach,
+	// and AfterAll. "Each" functions must be thread safe.
 	//
-	// 	specs.AddBeforeEach(func() {
+	// specs.AddBeforeAll(func() {
+	// 	initializeTestFramework()
+	// })
+	//
+	// specs.AddBeforeEach(func(spec ExtensionTestSpec) {
+	//	if spec.Name == "my test" {
 	//		// do stuff
-	//	})
+	//	}
+	// })
 	//
-	//	Also: AddBeforeAll, AddAfterEach, AddAfterAll
+	// specs.AddAfterEach(func(res *ExtensionTestResult) {
+	// 	if res.Result == ResultFailed && apiTimeoutRegexp.Matches(res.Output) {
+	// 		res.AddDetails("api-timeout", collectDiagnosticInfo())
+	// 	}
+	// })
 
 	// You can also manually build a test specs list from other testing tooling
 	// TODO: example
 
-	// Modify specs:
-	// Add label to all specs
-	// specs = specs.AddLabel("SLOW")
+	// Modify specs, such as adding a label to all specs
+	// 	specs = specs.AddLabel("SLOW")
 
 	// Specs can be globally filtered...
 	// specs = specs.MustFilter([]string{`name.contains("filter")`})
@@ -83,6 +92,7 @@ func main() {
 	//		spec.OtherNames = sets.New[string](`[sig-testing] openshift-tests-extension has a test with a tpyo`)
 	//	}
 	// })
+
 	ext.AddSpecs(specs)
 	registry.Register(ext)
 

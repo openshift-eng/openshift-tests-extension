@@ -222,12 +222,12 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 				})
 			}
 			if tc.expectedBeforeEach > 0 {
-				specs.AddBeforeEach(func() {
+				specs.AddBeforeEach(func(_ ExtensionTestSpec) {
 					beforeEachCount.Add(1)
 				})
 			}
 			if tc.expectedAfterEach > 0 {
-				specs.AddAfterEach(func() {
+				specs.AddAfterEach(func(_ *ExtensionTestResult) {
 					afterEachCount.Add(1)
 				})
 			}

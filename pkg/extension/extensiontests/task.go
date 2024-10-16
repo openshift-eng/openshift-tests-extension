@@ -2,16 +2,20 @@ package extensiontests
 
 import "sync/atomic"
 
-type Task interface {
-	Run()
+type SpecTask struct {
+	fn func(spec ExtensionTestSpec)
 }
 
-type RepeatableTask struct {
-	fn func()
+func (t *SpecTask) Run(spec ExtensionTestSpec) {
+	t.fn(spec)
 }
 
-func (t *RepeatableTask) Run() {
-	t.fn()
+type TestResultTask struct {
+	fn func(result *ExtensionTestResult)
+}
+
+func (t *TestResultTask) Run(result *ExtensionTestResult) {
+	t.fn(result)
 }
 
 type OneTimeTask struct {
