@@ -1,104 +1,56 @@
 [
   {
     "name": "[sig-testing] openshift-tests-extension ordered should run beforeAll once",
-    "otherNames": null,
     "labels": {},
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:payload:example-tests",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension setup should support beforeEach",
-    "otherNames": null,
     "labels": {},
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:payload:example-tests",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support passing tests",
-    "otherNames": null,
     "labels": {},
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:payload:example-tests",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support failing tests",
-    "otherNames": null,
     "labels": {},
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:payload:example-tests",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support panicking tests",
-    "otherNames": null,
     "labels": {},
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:payload:example-tests",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support slow tests",
-    "otherNames": null,
     "labels": {
       "SLOW": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:payload:example-tests",
     "lifecycle": "blocking"

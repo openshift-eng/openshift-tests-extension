@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/version"
 )
@@ -55,40 +57,45 @@ func (e *Extension) AddSpecs(specs et.ExtensionTestSpecs) {
 
 // IgnoreObsoleteTests allows removal of a test.
 func (e *Extension) IgnoreObsoleteTests(testNames ...string) {
-	e.obsoleteTests = append(e.obsoleteTests, testNames...)
+	if e.obsoleteTests == nil {
+		e.obsoleteTests = sets.New[string](testNames...)
+	} else {
+		e.obsoleteTests.Insert(testNames...)
+	}
 }
 
-// FindRemovedTestsWithoutRename compares two collections of specs, and if specs is missing a test from oldSpecs,
-// including consideration of other names, we return an error.  Can be used to detect test renames or removals.
+// FindRemovedTestsWithoutRename compares the current set of test specs against oldSpecs, including consideration of the original name,
+// we return an error.  Can be used to detect test renames or removals.
 func (e *Extension) FindRemovedTestsWithoutRename(oldSpecs et.ExtensionTestSpecs) ([]string, error) {
 	currentSpecs := e.GetSpecs()
-	// It's neat we can do it with CEL but can it handle it when we've got 10K tests in there?
-	potentiallyMissing, err := oldSpecs.Filter([]string{fmt.Sprintf(`!(name in %s)`, strSliceToCEL(currentSpecs.Names()))})
-	if err != nil {
-		return nil, err
-	}
+	currentMap := make(map[string]bool)
 
-	actuallyMissing, err := potentiallyMissing.Filter([]string{fmt.Sprintf(`!(%s.exists(d, name == d))`,
-		strSliceToCEL(currentSpecs.OtherNames()))})
-	if err != nil {
-		return nil, err
-	}
-
-	var unpermittedMissingTests []string
-	for _, spec := range actuallyMissing {
-		missing := true
-		for _, allowed := range e.obsoleteTests {
-			if spec.Name == allowed {
-				missing = false
-			}
-		}
-		if missing {
-			unpermittedMissingTests = append(unpermittedMissingTests, spec.Name)
+	// Populate current specs into a map for quick lookup by both Name and OriginalName.
+	for _, spec := range currentSpecs {
+		currentMap[spec.Name] = true
+		if spec.OriginalName != "" {
+			currentMap[spec.OriginalName] = true
 		}
 	}
 
-	if len(unpermittedMissingTests) > 0 {
-		return unpermittedMissingTests, fmt.Errorf("some tests were not found")
+	var removedTests []string
+
+	// Check oldSpecs against current specs.
+	for _, oldSpec := range oldSpecs {
+		// Skip if the test is marked as obsolete.
+		if e.obsoleteTests.Has(oldSpec.Name) {
+			continue
+		}
+
+		// Check if oldSpec is missing in currentSpecs by both Name and OriginalName.
+		if !currentMap[oldSpec.Name] && (oldSpec.OriginalName == "" || !currentMap[oldSpec.OriginalName]) {
+			removedTests = append(removedTests, oldSpec.Name)
+		}
+	}
+
+	// Return error if any removed tests were found.
+	if len(removedTests) > 0 {
+		return removedTests, fmt.Errorf("tests removed without rename: %v", removedTests)
 	}
 
 	return nil, nil

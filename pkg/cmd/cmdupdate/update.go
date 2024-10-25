@@ -58,7 +58,7 @@ func NewUpdateCommand(registry *extension.Registry) *cobra.Command {
 					}
 					fmt.Fprintf(os.Stderr, "\n")
 
-					return fmt.Errorf("missing tests, if you've renamed tests you must add their names to OtherNames, " +
+					return fmt.Errorf("missing tests, if you've renamed tests you must add their names to OriginalName, " +
 						"or mark them obsolete")
 				}
 			}
