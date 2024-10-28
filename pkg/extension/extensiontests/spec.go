@@ -22,16 +22,6 @@ func (specs ExtensionTestSpecs) Walk(walkFn func(*ExtensionTestSpec)) ExtensionT
 	return specs
 }
 
-func (specs ExtensionTestSpecs) OtherNames() []string {
-	var names []string
-	for _, spec := range specs {
-		for other := range spec.OtherNames {
-			names = append(names, other)
-		}
-	}
-	return names
-}
-
 func (specs ExtensionTestSpecs) Names() []string {
 	var names []string
 	for _, spec := range specs {
@@ -165,7 +155,7 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 		cel.Declarations(
 			decls.NewVar("source", decls.String),
 			decls.NewVar("name", decls.String),
-			decls.NewVar("other_names", decls.NewListType(decls.String)),
+			decls.NewVar("originalName", decls.String),
 			decls.NewVar("labels", decls.NewListType(decls.String)),
 			decls.NewVar("tags", decls.NewMapType(decls.String, decls.String)),
 		),
@@ -197,11 +187,11 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 			}
 
 			out, _, err := prg.Eval(map[string]interface{}{
-				"name":        spec.Name,
-				"source":      spec.Source,
-				"other_names": spec.OtherNames,
-				"labels":      spec.Labels.UnsortedList(),
-				"tags":        spec.Tags,
+				"name":         spec.Name,
+				"source":       spec.Source,
+				"originalName": spec.OriginalName,
+				"labels":       spec.Labels.UnsortedList(),
+				"tags":         spec.Tags,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating CEL expression: %v", err)

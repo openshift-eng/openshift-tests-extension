@@ -89,7 +89,7 @@ func main() {
 	//
 	// Test renames
 	//	if spec.Name == "[sig-testing] openshift-tests-extension has a test with a typo" {
-	//		spec.OtherNames = sets.New[string](`[sig-testing] openshift-tests-extension has a test with a tpyo`)
+	//		spec.OriginalName = `[sig-testing] openshift-tests-extension has a test with a tpyo`
 	//	}
 	// })
 

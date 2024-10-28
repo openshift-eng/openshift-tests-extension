@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 )
 
@@ -27,8 +25,8 @@ func TestExtension_FindRemovedTestsWithoutRename(t *testing.T) {
 			},
 			new: et.ExtensionTestSpecs{
 				{
-					Name:       "this test doesn't have a typo",
-					OtherNames: sets.New[string]("this test has a tpyo"),
+					Name:         "this test doesn't have a typo",
+					OriginalName: "this test has a tpyo",
 				},
 			},
 			wantErr: false,

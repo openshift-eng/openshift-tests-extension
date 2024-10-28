@@ -1,228 +1,132 @@
 [
   {
     "name": "[sig-testing] openshift-tests-extension should be run from the main directory",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension should run `make` command successfully",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] openshift-tests-extension should have the example-tests binary",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests info should have build metadata",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests info should have the expected suites",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests info should have the correct component information",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests list should list all specs",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests list should populate fields",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests list should filter specs by suite",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests run-suite should contain a test that passed",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests run-suite should have the correct error message for the failed test",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"
   },
   {
     "name": "[sig-testing] example-tests run-suite fast suite should not have a slow test",
-    "otherNames": null,
     "labels": {
       "framework": {}
     },
-    "tags": null,
     "resources": {
-      "isolation": {
-        "mode": "",
-        "conflict": null
-      },
-      "memory": "",
-      "duration": "",
-      "timeout": ""
+      "isolation": {}
     },
     "source": "openshift:framework:default",
     "lifecycle": "blocking"

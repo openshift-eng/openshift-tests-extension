@@ -1,6 +1,8 @@
 package extension
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 )
 
@@ -17,7 +19,7 @@ type Extension struct {
 
 	// Private data
 	specs         extensiontests.ExtensionTestSpecs
-	obsoleteTests []string
+	obsoleteTests sets.Set[string]
 }
 
 // Source contains the details of the commit and source URL.

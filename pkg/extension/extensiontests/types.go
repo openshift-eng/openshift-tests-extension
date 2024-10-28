@@ -16,9 +16,9 @@ type ExtensionTestSpecs []*ExtensionTestSpec
 type ExtensionTestSpec struct {
 	Name string `json:"name"`
 
-	// OtherNames contains a list of historical names for this test. If the test gets renamed in the future,
-	// this slice must report all the previous names for this test to preserve history.
-	OtherNames sets.Set[string] `json:"otherNames,omitempty"`
+	// OriginalName contains the very first name this test was ever known as, used to preserve
+	// history across all names.
+	OriginalName string `json:"originalName,omitempty"`
 
 	// Labels are single string values to apply to the test spec
 	Labels sets.Set[string] `json:"labels"`
