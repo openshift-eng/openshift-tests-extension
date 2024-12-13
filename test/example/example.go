@@ -51,4 +51,8 @@ var _ = Describe("[sig-testing] openshift-tests-extension", func() {
 		time.Sleep(15 * time.Second)
 		Expect(true).To(BeTrue())
 	})
+
+	It("should support test-skips via environment flags", func() {
+		Expect(true).To(BeTrue()) //This doesn't need to do anything special, just exist
+	})
 })
