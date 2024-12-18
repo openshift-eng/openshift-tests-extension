@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdenvflags"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdinfo"
@@ -18,6 +17,5 @@ func DefaultExtensionCommands(registry *extension.Registry) []*cobra.Command {
 		cmdlist.NewListCommand(registry),
 		cmdinfo.NewInfoCommand(registry),
 		cmdupdate.NewUpdateCommand(registry),
-		cmdenvflags.NewEnvironmentFlagListCommand(),
 	}
 }
