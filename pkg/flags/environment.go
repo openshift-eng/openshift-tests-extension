@@ -69,3 +69,16 @@ func (f *EnvironmentalFlags) IsEmpty() bool {
 		len(f.Facts) == 0 &&
 		f.Version == ""
 }
+
+// EnvironmentFlagVersions holds the "Since" version metadata for each flag.
+var EnvironmentFlagVersions = map[string]string{
+	"platform":     "v1.0",
+	"network":      "v1.0",
+	"upgrade":      "v1.0",
+	"topology":     "v1.0",
+	"architecture": "v1.0",
+	"installer":    "v1.0",
+	"config":       "v1.0",
+	"fact":         "v1.0",
+	"version":      "v1.0",
+}
