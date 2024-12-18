@@ -6,7 +6,8 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
-    "lifecycle": "blocking"
+    "lifecycle": "blocking",
+    "environmentSelector": {}
   },
   {
     "name": "[sig-testing] openshift-tests-extension setup should support beforeEach",
@@ -15,7 +16,8 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
-    "lifecycle": "blocking"
+    "lifecycle": "blocking",
+    "environmentSelector": {}
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support passing tests",
@@ -24,7 +26,8 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
-    "lifecycle": "blocking"
+    "lifecycle": "blocking",
+    "environmentSelector": {}
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support failing tests",
@@ -33,7 +36,8 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
-    "lifecycle": "blocking"
+    "lifecycle": "blocking",
+    "environmentSelector": {}
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support panicking tests",
@@ -42,7 +46,8 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
-    "lifecycle": "blocking"
+    "lifecycle": "blocking",
+    "environmentSelector": {}
   },
   {
     "name": "[sig-testing] openshift-tests-extension should support slow tests",
@@ -53,6 +58,19 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
-    "lifecycle": "blocking"
+    "lifecycle": "blocking",
+    "environmentSelector": {}
+  },
+  {
+    "name": "[sig-testing] openshift-tests-extension should support test-skips via environment flags",
+    "labels": {},
+    "resources": {
+      "isolation": {}
+    },
+    "source": "openshift:payload:example-tests",
+    "lifecycle": "blocking",
+    "environmentSelector": {
+      "include": "platform==\"aws\""
+    }
   }
 ]

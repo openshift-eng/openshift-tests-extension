@@ -28,6 +28,18 @@ var _ = Describe("[sig-testing] example-tests list", Label("framework"), func() 
 			Expect(spec.Labels).ToNot(HaveKey("SLOW"))
 		}
 	})
+
+	It("should filter specs by environment flags", func() {
+		specs := runList("--platform", "aws")
+		for _, spec := range specs {
+			if !spec.EnvironmentSelector.IsEmpty() {
+				Expect(spec.EnvironmentSelector).To(Equal(e.EnvironmentSelector{
+					Include: `platform=="aws"`,
+				}))
+			}
+		}
+	})
+
 })
 
 func runList(args ...string) e.ExtensionTestSpecs {
@@ -35,7 +47,7 @@ func runList(args ...string) e.ExtensionTestSpecs {
 	args = append([]string{"list"}, args...)
 	cmd := exec.Command(binary, args...)
 	output, err := cmd.Output()
-	Expect(err).ShouldNot(HaveOccurred(), "Expected `example-tests info` to run successfully")
+	Expect(err).ShouldNot(HaveOccurred(), "Expected `example-tests list` to run successfully")
 	// Unmarshal the JSON output
 	err = json.Unmarshal(output, &result)
 	Expect(err).ShouldNot(HaveOccurred(), "Expected JSON output to unmarshal into Extension struct")

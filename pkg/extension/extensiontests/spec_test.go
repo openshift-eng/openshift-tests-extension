@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -259,6 +261,274 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 			if afterAllCount.Load() != tc.expectedAfterAll {
 				t.Errorf("Expected AfterAll to run %d times, but ran %d times", tc.expectedAfterAll,
 					afterAllCount.Load())
+			}
+		})
+	}
+}
+
+func TestExtensionTestSpec_Include(t *testing.T) {
+	testCases := []struct {
+		name string
+		cel  string
+		spec *ExtensionTestSpec
+	}{
+		{
+			name: "simple OR expression",
+			cel:  Or(PlatformEquals("aws"), NetworkEquals("ovn")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Include: `(platform=="aws" || network=="ovn")`},
+			},
+		},
+		{
+			name: "simple AND expression",
+			cel:  And(UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Include: `(upgrade=="minor" && topology=="microshift" && architecture=="amd64")`},
+			},
+		},
+		{
+			name: "complex expression with AND and OR",
+			cel:  And(Or(PlatformEquals("aws"), NetworkEquals("ovn")), And(UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"))),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Include: `((platform=="aws" || network=="ovn") && (upgrade=="minor" && topology=="microshift" && architecture=="amd64"))`},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &ExtensionTestSpec{}
+			resultingSpec := spec.Include(tc.cel)
+			if diff := cmp.Diff(tc.spec, resultingSpec, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("Include returned unexpected resulting spec (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestExtensionTestSpec_Exclude(t *testing.T) {
+	testCases := []struct {
+		name string
+		cel  string
+		spec *ExtensionTestSpec
+	}{
+		{
+			name: "simple OR expression",
+			cel:  Or(InstallerEquals("upi"), VersionEquals("4.19")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Exclude: `(installer=="upi" || version=="4.19")`},
+			},
+		},
+		{
+			name: "complex expression utilizing config options",
+			cel:  And(ConfigContainsAll("must-include", "also-true"), ConfigContainsAny("some-config-option", "some-other-option")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Exclude: `((config.exists(c, c=="must-include") && config.exists(c, c=="also-true")) && (config.exists(c, c=="some-config-option") || config.exists(c, c=="some-other-option")))`},
+			},
+		},
+		{
+			name: "complex expression utilizing facts",
+			cel:  And(FactEquals("cool.component", "absolutely"), FactEquals("simple.to.use", "true")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Exclude: `((fact_keys.exists(k, k=="cool.component") && facts["cool.component"].matches("absolutely")) && (fact_keys.exists(k, k=="simple.to.use") && facts["simple.to.use"].matches("true")))`},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &ExtensionTestSpec{}
+			resultingSpec := spec.Exclude(tc.cel)
+			if diff := cmp.Diff(tc.spec, resultingSpec, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("Include returned unexpected resulting spec (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
+	testCases := []struct {
+		name     string
+		specs    ExtensionTestSpecs
+		envFlags flags.EnvironmentalFlags
+		want     ExtensionTestSpecs
+		wantErr  error
+	}{
+		{
+			name: "no environment info",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "spec1",
+				},
+				{
+					Name: "spec2",
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{Platform: "aws"},
+			want: ExtensionTestSpecs{
+				{
+					Name: "spec1",
+				},
+				{
+					Name: "spec2",
+				},
+			},
+		},
+		{
+			name: "filter on single include expression",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "spec-aws-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: PlatformEquals("aws"),
+					},
+				},
+				{
+					Name: "spec-gcp-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: PlatformEquals("gcp"),
+					},
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{Platform: "aws"},
+			want: ExtensionTestSpecs{
+				{
+					Name: "spec-aws-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: PlatformEquals("aws"),
+					},
+				},
+			},
+		},
+		{
+			name: "filter on single exclude expression",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "spec-non-aws-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Exclude: PlatformEquals("aws"),
+					},
+				},
+				{
+					Name: "spec-non-gcp-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Exclude: PlatformEquals("gcp"),
+					},
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{Platform: "aws"},
+			want: ExtensionTestSpecs{
+				{
+					Name: "spec-non-gcp-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Exclude: PlatformEquals("gcp"),
+					},
+				},
+			},
+		},
+		{
+			name: "filter on complex expressions",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "complex-spec-included",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: And(
+							Or(
+								PlatformEquals("aws"), NetworkEquals("ovn")),
+							And(
+								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
+							),
+						),
+					},
+				},
+				{
+					Name: "complex-spec-excluded",
+					EnvironmentSelector: EnvironmentSelector{
+						Exclude: And(
+							Or(
+								PlatformEquals("aws"), NetworkEquals("ovn")),
+							And(
+								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
+							),
+						),
+					},
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{
+				Platform:     "aws",
+				Network:      "sdn",
+				Upgrade:      "minor",
+				Topology:     "microshift",
+				Architecture: "amd64",
+				Version:      "4.18",
+			},
+			want: ExtensionTestSpecs{
+				{
+					Name: "complex-spec-included",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: And(
+							Or(
+								PlatformEquals("aws"), NetworkEquals("ovn")),
+							And(
+								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
+							),
+						),
+					},
+				},
+			},
+		},
+		{
+			name: "exclude takes priority over conflicting include",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "spec-aws-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: PlatformEquals("aws"),
+						Exclude: PlatformEquals("aws"),
+					},
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{Platform: "aws"},
+		},
+		{
+			name: "include based on facts",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "only-when-cool",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: And(FactEquals("cool.component", "absolutely")),
+					},
+				},
+				{
+					Name: "only-when-super-cool",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: And(FactEquals("super.cool.component", "absolutely")),
+					},
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{Facts: map[string]string{"cool.component": "absolutely"}},
+			want: ExtensionTestSpecs{
+				{
+					Name: "only-when-cool",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: And(FactEquals("cool.component", "absolutely")),
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := tc.specs.FilterByEnvironment(tc.envFlags)
+			if diff := cmp.Diff(tc.wantErr, err, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("FilterByEnvironment returned unexpected error (-want +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("FilterByEnvironment returned unexpected result (-want +got):\n%s", diff)
 			}
 		})
 	}
