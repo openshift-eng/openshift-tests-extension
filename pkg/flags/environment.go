@@ -5,11 +5,11 @@ import "github.com/spf13/pflag"
 type EnvironmentalFlags struct {
 	Platform     string
 	Network      string
+	NetworkStack string
 	Upgrade      string
 	Topology     string
 	Architecture string
 	Installer    string
-	Config       []string
 	Facts        map[string]string
 	Version      string
 }
@@ -27,6 +27,10 @@ func (f *EnvironmentalFlags) BindFlags(fs *pflag.FlagSet) {
 		"network",
 		"",
 		"The network of the target cluster (\"ovn\", \"sdn\"). Since: v1.0")
+	fs.StringVar(&f.NetworkStack,
+		"network-stack",
+		"",
+		"The network stack of the target cluster (\"ipv6\", \"ipv4\", \"dual\"). Since: v1.0")
 	fs.StringVar(&f.Upgrade,
 		"upgrade",
 		"",
@@ -43,11 +47,6 @@ func (f *EnvironmentalFlags) BindFlags(fs *pflag.FlagSet) {
 		"installer",
 		"",
 		"The installer used to create the cluster (\"ipi\", \"upi\", \"assisted\", ...). Since: v1.0")
-	fs.StringSliceVarP(&f.Config,
-		"config",
-		"",
-		[]string{},
-		"Multiple. Non-default component configuration in the environment. Since: v1.0")
 	fs.StringToStringVar(&f.Facts,
 		"fact",
 		make(map[string]string),
@@ -61,24 +60,24 @@ func (f *EnvironmentalFlags) BindFlags(fs *pflag.FlagSet) {
 func (f *EnvironmentalFlags) IsEmpty() bool {
 	return f.Platform == "" &&
 		f.Network == "" &&
+		f.NetworkStack == "" &&
 		f.Upgrade == "" &&
 		f.Topology == "" &&
 		f.Architecture == "" &&
 		f.Installer == "" &&
-		len(f.Config) == 0 &&
 		len(f.Facts) == 0 &&
 		f.Version == ""
 }
 
 // EnvironmentFlagVersions holds the "Since" version metadata for each flag.
 var EnvironmentFlagVersions = map[string]string{
-	"platform":     "v1.0",
-	"network":      "v1.0",
-	"upgrade":      "v1.0",
-	"topology":     "v1.0",
-	"architecture": "v1.0",
-	"installer":    "v1.0",
-	"config":       "v1.0",
-	"fact":         "v1.0",
-	"version":      "v1.0",
+	"platform":      "v1.0",
+	"network":       "v1.0",
+	"network-stack": "v1.0",
+	"upgrade":       "v1.0",
+	"topology":      "v1.0",
+	"architecture":  "v1.0",
+	"installer":     "v1.0",
+	"fact":          "v1.0",
+	"version":       "v1.0",
 }

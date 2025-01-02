@@ -323,14 +323,6 @@ func TestExtensionTestSpec_Exclude(t *testing.T) {
 			},
 		},
 		{
-			name: "complex expression utilizing config options",
-			cel:  And(ConfigContainsAll("must-include", "also-true"), ConfigContainsAny("some-config-option", "some-other-option")),
-			spec: &ExtensionTestSpec{
-				EnvironmentSelector: EnvironmentSelector{
-					Exclude: `((config.exists(c, c=="must-include") && config.exists(c, c=="also-true")) && (config.exists(c, c=="some-config-option") || config.exists(c, c=="some-other-option")))`},
-			},
-		},
-		{
 			name: "complex expression utilizing facts",
 			cel:  And(FactEquals("cool.component", "absolutely"), FactEquals("simple.to.use", "true")),
 			spec: &ExtensionTestSpec{
@@ -438,7 +430,7 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 					EnvironmentSelector: EnvironmentSelector{
 						Include: And(
 							Or(
-								PlatformEquals("aws"), NetworkEquals("ovn")),
+								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6")),
 							And(
 								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
 							),
@@ -450,7 +442,7 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 					EnvironmentSelector: EnvironmentSelector{
 						Exclude: And(
 							Or(
-								PlatformEquals("aws"), NetworkEquals("ovn")),
+								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6")),
 							And(
 								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
 							),
@@ -461,6 +453,7 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 			envFlags: flags.EnvironmentalFlags{
 				Platform:     "aws",
 				Network:      "sdn",
+				NetworkStack: "ipv6",
 				Upgrade:      "minor",
 				Topology:     "microshift",
 				Architecture: "amd64",
@@ -472,7 +465,7 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 					EnvironmentSelector: EnvironmentSelector{
 						Include: And(
 							Or(
-								PlatformEquals("aws"), NetworkEquals("ovn")),
+								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6")),
 							And(
 								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
 							),

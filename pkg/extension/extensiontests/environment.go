@@ -13,6 +13,10 @@ func NetworkEquals(network string) string {
 	return fmt.Sprintf(`network=="%s"`, network)
 }
 
+func NetworkStackEquals(networkStack string) string {
+	return fmt.Sprintf(`networkStack=="%s"`, networkStack)
+}
+
 func UpgradeEquals(upgrade string) string {
 	return fmt.Sprintf(`upgrade=="%s"`, upgrade)
 }
@@ -31,24 +35,6 @@ func InstallerEquals(installer string) string {
 
 func VersionEquals(version string) string {
 	return fmt.Sprintf(`version=="%s"`, version)
-}
-
-func ConfigContainsAll(elem ...string) string {
-	for i := range elem {
-		elem[i] = ConfigExists(elem[i])
-	}
-	return fmt.Sprintf("(%s)", fmt.Sprint(strings.Join(elem, " && ")))
-}
-
-func ConfigContainsAny(elem ...string) string {
-	for i := range elem {
-		elem[i] = ConfigExists(elem[i])
-	}
-	return fmt.Sprintf("(%s)", fmt.Sprint(strings.Join(elem, " || ")))
-}
-
-func ConfigExists(elem string) string {
-	return fmt.Sprintf(`config.exists(c, c=="%s")`, elem)
 }
 
 func FactEquals(key, value string) string {
