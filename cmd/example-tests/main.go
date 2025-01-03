@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
@@ -53,6 +54,13 @@ func main() {
 		panic(fmt.Sprintf("couldn't build extension test specs from ginkgo: %+v", err.Error()))
 	}
 
+	// Environment selector information can be added to test specs to support filtering by environment
+	specs.Walk(func(spec *et.ExtensionTestSpec) {
+		if spec.Name == "[sig-testing] openshift-tests-extension should support test-skips via environment flags" {
+			spec.Include(et.PlatformEquals("aws"))
+		}
+	})
+
 	// You can add hooks to run before/after tests. There are BeforeEach, BeforeAll, AfterEach,
 	// and AfterAll. "Each" functions must be thread safe.
 	//
@@ -90,6 +98,12 @@ func main() {
 	// Test renames
 	//	if spec.Name == "[sig-testing] openshift-tests-extension has a test with a typo" {
 	//		spec.OriginalName = `[sig-testing] openshift-tests-extension has a test with a tpyo`
+	//	}
+	//
+	// Filter by environment flags
+	// if spec.Name == "[sig-testing] openshift-tests-extension should support defining the platform for tests" {
+	//		spec.Include(et.PlatformEquals("aws"))
+	//		spec.Exclude(et.And(et.NetworkEquals("ovn"), et.TopologyEquals("ha")))
 	//	}
 	// })
 

@@ -9,6 +9,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
 )
@@ -172,24 +173,10 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 	for _, spec := range specs {
 		include := false
 		for _, celExpr := range celExprs {
-			// Parse CEL expression
-			ast, iss := env.Parse(celExpr)
-			if iss.Err() != nil {
-				return nil, fmt.Errorf("error parsing CEL expression '%s': %v", celExpr, iss.Err())
-			}
-
-			// Check the AST
-			checked, iss := env.Check(ast)
-			if iss.Err() != nil {
-				return nil, fmt.Errorf("error checking CEL expression '%s': %v", celExpr, iss.Err())
-			}
-
-			// Create a CEL program from the checked AST
-			prg, err := env.Program(checked)
+			prg, err := programForCEL(env, celExpr)
 			if err != nil {
-				return nil, fmt.Errorf("error creating CEL program: %v", err)
+				return nil, err
 			}
-
 			out, _, err := prg.Eval(map[string]interface{}{
 				"name":         spec.Name,
 				"source":       spec.Source,
@@ -210,6 +197,117 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 		if include {
 			filteredSpecs = append(filteredSpecs, spec)
 		}
+	}
+
+	return filteredSpecs, nil
+}
+
+func programForCEL(env *cel.Env, celExpr string) (cel.Program, error) {
+	// Parse CEL expression
+	ast, iss := env.Parse(celExpr)
+	if iss.Err() != nil {
+		return nil, fmt.Errorf("error parsing CEL expression '%s': %v", celExpr, iss.Err())
+	}
+
+	// Check the AST
+	checked, iss := env.Check(ast)
+	if iss.Err() != nil {
+		return nil, fmt.Errorf("error checking CEL expression '%s': %v", celExpr, iss.Err())
+	}
+
+	// Create a CEL program from the checked AST
+	prg, err := env.Program(checked)
+	if err != nil {
+		return nil, fmt.Errorf("error creating CEL program: %v", err)
+	}
+	return prg, nil
+}
+
+// FilterByEnvironment checks both the Include and Exclude fields of the ExtensionTestSpec to return those specs which match.
+// Tests will be included by default unless they are explicitly excluded. If Include is specified, only those tests matching
+// the CEL expression will be included.
+//
+// See helper functions in extensiontests/environment.go to craft CEL expressions
+func (specs ExtensionTestSpecs) FilterByEnvironment(envFlags flags.EnvironmentalFlags) (ExtensionTestSpecs, error) {
+	var filteredSpecs ExtensionTestSpecs
+	if envFlags.IsEmpty() {
+		return specs, nil
+	}
+
+	env, err := cel.NewEnv(
+		cel.Declarations(
+			decls.NewVar("platform", decls.String),
+			decls.NewVar("network", decls.String),
+			decls.NewVar("networkStack", decls.String),
+			decls.NewVar("upgrade", decls.String),
+			decls.NewVar("topology", decls.String),
+			decls.NewVar("architecture", decls.String),
+			decls.NewVar("installer", decls.String),
+			decls.NewVar("facts", decls.NewMapType(decls.String, decls.String)),
+			decls.NewVar("fact_keys", decls.NewListType(decls.String)),
+			decls.NewVar("version", decls.String),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CEL environment: %w", err)
+	}
+	factKeys := make([]string, len(envFlags.Facts))
+	for k := range envFlags.Facts {
+		factKeys = append(factKeys, k)
+	}
+	vars := map[string]interface{}{
+		"platform":     envFlags.Platform,
+		"network":      envFlags.Network,
+		"networkStack": envFlags.NetworkStack,
+		"upgrade":      envFlags.Upgrade,
+		"topology":     envFlags.Topology,
+		"architecture": envFlags.Architecture,
+		"installer":    envFlags.Installer,
+		"facts":        envFlags.Facts,
+		"fact_keys":    factKeys,
+		"version":      envFlags.Version,
+	}
+
+	for _, spec := range specs {
+		envSel := spec.EnvironmentSelector
+		// If there is no include or exclude CEL, include it implicitly
+		if envSel.IsEmpty() {
+			filteredSpecs = append(filteredSpecs, spec)
+			continue
+		}
+
+		if envSel.Exclude != "" {
+			prg, err := programForCEL(env, envSel.Exclude)
+			if err != nil {
+				return nil, err
+			}
+			out, _, err := prg.Eval(vars)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating CEL expression: %v", err)
+			}
+			// If it is explicitly excluded, don't check include
+			if out == types.True {
+				continue
+			}
+		}
+
+		if envSel.Include != "" {
+			prg, err := programForCEL(env, envSel.Include)
+			if err != nil {
+				return nil, err
+			}
+			out, _, err := prg.Eval(vars)
+			if err != nil {
+				return nil, fmt.Errorf("error evaluating CEL expression: %v", err)
+			}
+
+			if out == types.True {
+				filteredSpecs = append(filteredSpecs, spec)
+			}
+		} else { // If it hasn't been excluded, and there is no "include" it will be implicitly included
+			filteredSpecs = append(filteredSpecs, spec)
+		}
+
 	}
 
 	return filteredSpecs, nil
@@ -249,6 +347,18 @@ func (specs ExtensionTestSpecs) UnsetTag(key string) ExtensionTestSpecs {
 	}
 
 	return specs
+}
+
+// Include adds the specified CEL expression to explicitly include tests by environment
+func (spec *ExtensionTestSpec) Include(includeCEL string) *ExtensionTestSpec {
+	spec.EnvironmentSelector.Include = includeCEL
+	return spec
+}
+
+// Exclude adds the specified CEL expression to explicitly exclude tests by environment
+func (spec *ExtensionTestSpec) Exclude(excludeCEL string) *ExtensionTestSpec {
+	spec.EnvironmentSelector.Exclude = excludeCEL
+	return spec
 }
 
 func runSpec(spec *ExtensionTestSpec) *ExtensionTestResult {
