@@ -55,11 +55,8 @@ func main() {
 	}
 
 	// Environment selector information can be added to test specs to support filtering by environment
-	specs.Walk(func(spec *et.ExtensionTestSpec) {
-		if spec.Name == "[sig-testing] openshift-tests-extension should support test-skips via environment flags" {
-			spec.Include(et.PlatformEquals("aws"))
-		}
-	})
+	specs.Select(et.NameContains("[sig-testing] openshift-tests-extension should support test-skips via environment flags")).
+		Include(et.PlatformEquals("aws"))
 
 	// You can add hooks to run before/after tests. There are BeforeEach, BeforeAll, AfterEach,
 	// and AfterAll. "Each" functions must be thread safe.
@@ -94,6 +91,15 @@ func main() {
 	//	if strings.Contains(e.Name, "scale up") {
 	//		e.Labels.Insert("SLOW")
 	//	}
+	//
+	// Specs can also be selected...
+	// specs = specs.Select(et.NameContains("slow test")).AddLabel("SLOW")
+	//
+	// Or with "any" (or) matching selections
+	// specs = specs.SelectAny(et.NameContains("slow test"), et.HasLabel("SLOW"))
+	//
+	// Or with "all" (and) matching selections
+	// specs = specs.SelectAll(et.NameContains("slow test"), et.HasTagWithValue("speed", "slow"))
 	//
 	// Test renames
 	//	if spec.Name == "[sig-testing] openshift-tests-extension has a test with a typo" {

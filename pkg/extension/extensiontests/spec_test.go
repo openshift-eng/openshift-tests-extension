@@ -526,3 +526,285 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 		})
 	}
 }
+
+func TestSelect(t *testing.T) {
+	testCases := []struct {
+		name     string
+		specs    ExtensionTestSpecs
+		selectFn SelectFunction
+		want     ExtensionTestSpecs
+	}{
+		{
+			name: "name contains",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+			selectFn: NameContains("aws"),
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+			},
+		},
+		{
+			name: "can return multiple",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+				{
+					Name: "another-aws-test",
+				},
+			},
+			selectFn: NameContains("aws"),
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "another-aws-test",
+				},
+			},
+		},
+		{
+			name: "has label",
+			specs: ExtensionTestSpecs{
+				{
+					Name:   "aws",
+					Labels: sets.New("aws-test"),
+				},
+				{
+					Name:   "gcp",
+					Labels: sets.New("gcp-test"),
+				},
+			},
+			selectFn: HasLabel("aws-test"),
+			want: ExtensionTestSpecs{
+				{
+					Name:   "aws",
+					Labels: sets.New("aws-test"),
+				},
+			},
+		},
+		{
+			name: "has tag with value",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws",
+					Tags: map[string]string{
+						"tag-a": "val",
+					},
+				},
+				{
+					Name: "gcp",
+					Tags: map[string]string{
+						"tag-a": "another-val",
+					},
+				},
+			},
+			selectFn: HasTagWithValue("tag-a", "another-val"),
+			want: ExtensionTestSpecs{
+				{
+					Name: "gcp",
+					Tags: map[string]string{
+						"tag-a": "another-val",
+					},
+				},
+			},
+		},
+		{
+			name: "with lifecycle",
+			specs: ExtensionTestSpecs{
+				{
+					Name:      "aws",
+					Lifecycle: LifecycleBlocking,
+				},
+				{
+					Name:      "gcp",
+					Lifecycle: LifecycleInforming,
+				},
+			},
+			selectFn: WithLifecycle(LifecycleBlocking),
+			want: ExtensionTestSpecs{
+				{
+					Name:      "aws",
+					Lifecycle: LifecycleBlocking,
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.specs.Select(tc.selectFn)
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("Select returned unexpected result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSelectAny(t *testing.T) {
+	testCases := []struct {
+		name      string
+		specs     ExtensionTestSpecs
+		selectFns []SelectFunction
+		want      ExtensionTestSpecs
+	}{
+		{
+			name: "name contains",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "azure-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+			selectFns: []SelectFunction{NameContains("aws"), NameContains("gcp")},
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+		},
+		{
+			name: "has label or tag with value",
+			specs: ExtensionTestSpecs{
+				{
+					Name:   "aws",
+					Labels: sets.New("aws-test"),
+					Tags: map[string]string{
+						"tag-a": "val",
+					},
+				},
+				{
+					Name:   "excluded",
+					Labels: sets.New("gcp-test"),
+					Tags: map[string]string{
+						"tag-a": "val",
+					},
+				},
+				{
+					Name:   "gcp",
+					Labels: sets.New("gcp-test"),
+					Tags: map[string]string{
+						"tag-a": "another-val",
+					},
+				},
+			},
+			selectFns: []SelectFunction{HasLabel("aws-test"), HasTagWithValue("tag-a", "another-val")},
+			want: ExtensionTestSpecs{
+				{
+					Name:   "aws",
+					Labels: sets.New("aws-test"),
+					Tags: map[string]string{
+						"tag-a": "val",
+					},
+				},
+				{
+					Name:   "gcp",
+					Labels: sets.New("gcp-test"),
+					Tags: map[string]string{
+						"tag-a": "another-val",
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.specs.SelectAny(tc.selectFns)
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("SelectAny returned unexpected result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSelectAll(t *testing.T) {
+	testCases := []struct {
+		name      string
+		specs     ExtensionTestSpecs
+		selectFns []SelectFunction
+		want      ExtensionTestSpecs
+	}{
+		{
+			name: "name contains",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "azure-only",
+				},
+				{
+					Name: "aws-test",
+				},
+			},
+			selectFns: []SelectFunction{NameContains("aws"), NameContains("test")},
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-test",
+				},
+			},
+		},
+		{
+			name: "has label and tag with value",
+			specs: ExtensionTestSpecs{
+				{
+					Name:   "aws",
+					Labels: sets.New("aws-test"),
+					Tags: map[string]string{
+						"tag-a": "good-val",
+					},
+				},
+				{
+					Name:   "excluded",
+					Labels: sets.New("aws-test"),
+					Tags: map[string]string{
+						"tag-a": "val",
+					},
+				},
+				{
+					Name:   "gcp",
+					Labels: sets.New("gcp-test"),
+					Tags: map[string]string{
+						"tag-a": "good-val",
+					},
+				},
+			},
+			selectFns: []SelectFunction{HasLabel("aws-test"), HasTagWithValue("tag-a", "good-val")},
+			want: ExtensionTestSpecs{
+				{
+					Name:   "aws",
+					Labels: sets.New("aws-test"),
+					Tags: map[string]string{
+						"tag-a": "good-val",
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.specs.SelectAll(tc.selectFns)
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("SelectAny returned unexpected result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
