@@ -2,6 +2,7 @@ package extensiontests
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,6 +22,82 @@ func (specs ExtensionTestSpecs) Walk(walkFn func(*ExtensionTestSpec)) ExtensionT
 	}
 
 	return specs
+}
+
+type SelectFunction func(spec *ExtensionTestSpec) bool
+
+// Select filters the ExtensionTestSpecs to only those that match the provided SelectFunction
+func (specs ExtensionTestSpecs) Select(selectFn SelectFunction) ExtensionTestSpecs {
+	filtered := ExtensionTestSpecs{}
+	for _, spec := range specs {
+		if selectFn(spec) {
+			filtered = append(filtered, spec)
+		}
+	}
+
+	return filtered
+}
+
+// SelectAny filters the ExtensionTestSpecs to only those that match any of the provided SelectFunctions
+func (specs ExtensionTestSpecs) SelectAny(selectFns []SelectFunction) ExtensionTestSpecs {
+	filtered := ExtensionTestSpecs{}
+	for _, spec := range specs {
+		for _, selectFn := range selectFns {
+			if selectFn(spec) {
+				filtered = append(filtered, spec)
+				break
+			}
+		}
+	}
+
+	return filtered
+}
+
+// SelectAll filters the ExtensionTestSpecs to only those that match all the provided SelectFunctions
+func (specs ExtensionTestSpecs) SelectAll(selectFns []SelectFunction) ExtensionTestSpecs {
+	filtered := ExtensionTestSpecs{}
+	for _, spec := range specs {
+		anyFalse := false
+		for _, selectFn := range selectFns {
+			if !selectFn(spec) {
+				anyFalse = true
+				break
+			}
+		}
+		if !anyFalse {
+			filtered = append(filtered, spec)
+		}
+	}
+
+	return filtered
+}
+
+// NameContains returns a function that selects specs whose name contains the provided string
+func NameContains(name string) SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		return strings.Contains(spec.Name, name)
+	}
+}
+
+// HasLabel returns a function that selects specs with the provided label
+func HasLabel(label string) SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		return spec.Labels.Has(label)
+	}
+}
+
+// HasTagWithValue returns a function that selects specs containing a tag with the provided key and value
+func HasTagWithValue(key, value string) SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		return spec.Tags[key] == value
+	}
+}
+
+// WithLifecycle returns a function that selects specs with the provided Lifecycle
+func WithLifecycle(lifecycle Lifecycle) SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		return spec.Lifecycle == lifecycle
+	}
 }
 
 func (specs ExtensionTestSpecs) Names() []string {
@@ -346,6 +423,22 @@ func (specs ExtensionTestSpecs) UnsetTag(key string) ExtensionTestSpecs {
 		delete(specs[i].Tags, key)
 	}
 
+	return specs
+}
+
+// Include adds the specified CEL expression to explicitly include tests by environment to each spec
+func (specs ExtensionTestSpecs) Include(includeCEL string) ExtensionTestSpecs {
+	for _, spec := range specs {
+		spec.Include(includeCEL)
+	}
+	return specs
+}
+
+// Exclude adds the specified CEL expression to explicitly exclude tests by environment to each spec
+func (specs ExtensionTestSpecs) Exclude(excludeCEL string) ExtensionTestSpecs {
+	for _, spec := range specs {
+		spec.Exclude(excludeCEL)
+	}
 	return specs
 }
 
