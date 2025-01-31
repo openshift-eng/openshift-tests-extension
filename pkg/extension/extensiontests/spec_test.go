@@ -591,6 +591,23 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
+			name: "name contains all",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "aws-only-with-some-extra",
+				},
+			},
+			selectFn: NameContainsAll("aws", "some-extra"),
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only-with-some-extra",
+				},
+			},
+		},
+		{
 			name: "can return multiple",
 			specs: ExtensionTestSpecs{
 				{

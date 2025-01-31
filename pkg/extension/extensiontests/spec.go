@@ -79,6 +79,18 @@ func NameContains(name string) SelectFunction {
 	}
 }
 
+// NameContainsAll returns a function that selects specs whose name contains each of the provided contents strings
+func NameContainsAll(contents ...string) SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		for _, content := range contents {
+			if !strings.Contains(spec.Name, content) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 // HasLabel returns a function that selects specs with the provided label
 func HasLabel(label string) SelectFunction {
 	return func(spec *ExtensionTestSpec) bool {
