@@ -3,15 +3,16 @@ package flags
 import "github.com/spf13/pflag"
 
 type EnvironmentalFlags struct {
-	Platform     string
-	Network      string
-	NetworkStack string
-	Upgrade      string
-	Topology     string
-	Architecture string
-	Installer    string
-	Facts        map[string]string
-	Version      string
+	Platform             string
+	Network              string
+	NetworkStack         string
+	Upgrade              string
+	Topology             string
+	Architecture         string
+	ExternalConnectivity string
+	OptionalCapabilities []string
+	Facts                map[string]string
+	Version              string
 }
 
 func NewEnvironmentalFlags() *EnvironmentalFlags {
@@ -43,10 +44,14 @@ func (f *EnvironmentalFlags) BindFlags(fs *pflag.FlagSet) {
 		"architecture",
 		"",
 		"The CPU architecture of the target cluster (\"amd64\", \"arm64\"). Since: v1.0")
-	fs.StringVar(&f.Installer,
-		"installer",
+	fs.StringVar(&f.ExternalConnectivity,
+		"external-connectivity",
 		"",
-		"The installer used to create the cluster (\"ipi\", \"upi\", \"assisted\", ...). Since: v1.0")
+		"The External Connectivity of the target cluster (\"Disconnected\", \"Direct\", \"Proxied\"). Since: v1.0")
+	fs.StringSliceVar(&f.OptionalCapabilities,
+		"optional-capability",
+		[]string{},
+		"An Optional Capability of the target cluster. Can be passed multiple times. Since: v1.0")
 	fs.StringToStringVar(&f.Facts,
 		"fact",
 		make(map[string]string),
@@ -64,20 +69,22 @@ func (f *EnvironmentalFlags) IsEmpty() bool {
 		f.Upgrade == "" &&
 		f.Topology == "" &&
 		f.Architecture == "" &&
-		f.Installer == "" &&
+		f.ExternalConnectivity == "" &&
+		f.OptionalCapabilities == nil &&
 		len(f.Facts) == 0 &&
 		f.Version == ""
 }
 
 // EnvironmentFlagVersions holds the "Since" version metadata for each flag.
 var EnvironmentFlagVersions = map[string]string{
-	"platform":      "v1.0",
-	"network":       "v1.0",
-	"network-stack": "v1.0",
-	"upgrade":       "v1.0",
-	"topology":      "v1.0",
-	"architecture":  "v1.0",
-	"installer":     "v1.0",
-	"fact":          "v1.0",
-	"version":       "v1.0",
+	"platform":              "v1.0",
+	"network":               "v1.0",
+	"network-stack":         "v1.0",
+	"upgrade":               "v1.0",
+	"topology":              "v1.0",
+	"architecture":          "v1.0",
+	"external-connectivity": "v1.0",
+	"optional-capability":   "v1.0",
+	"fact":                  "v1.0",
+	"version":               "v1.0",
 }
