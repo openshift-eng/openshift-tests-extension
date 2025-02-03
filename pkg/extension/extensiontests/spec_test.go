@@ -430,7 +430,7 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 					EnvironmentSelector: EnvironmentSelector{
 						Include: And(
 							Or(
-								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6")),
+								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6"), ExternalConnectivityEquals("Disconnected")),
 							And(
 								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
 							),
@@ -451,13 +451,14 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 				},
 			},
 			envFlags: flags.EnvironmentalFlags{
-				Platform:     "aws",
-				Network:      "sdn",
-				NetworkStack: "ipv6",
-				Upgrade:      "minor",
-				Topology:     "microshift",
-				Architecture: "amd64",
-				Version:      "4.18",
+				Platform:             "aws",
+				Network:              "sdn",
+				NetworkStack:         "ipv6",
+				Upgrade:              "minor",
+				Topology:             "microshift",
+				Architecture:         "amd64",
+				Version:              "4.18",
+				ExternalConnectivity: "Disconnected",
 			},
 			want: ExtensionTestSpecs{
 				{
@@ -465,7 +466,7 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 					EnvironmentSelector: EnvironmentSelector{
 						Include: And(
 							Or(
-								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6")),
+								PlatformEquals("aws"), NetworkEquals("ovn"), NetworkStackEquals("ipv6"), ExternalConnectivityEquals("Disconnected")),
 							And(
 								UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"),
 							),
@@ -513,6 +514,44 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "include based on optional capabilities",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "spec-baremetal-build",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: OptionalCapabilitiesIncludeAny("baremetal", "build"),
+					},
+				},
+				{
+					Name: "spec-baremetal-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: OptionalCapabilitiesIncludeAll("baremetal"),
+					},
+				},
+				{
+					Name: "spec-build-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: OptionalCapabilitiesIncludeAll("build"),
+					},
+				},
+			},
+			envFlags: flags.EnvironmentalFlags{OptionalCapabilities: []string{"baremetal"}},
+			want: ExtensionTestSpecs{
+				{
+					Name: "spec-baremetal-build",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: OptionalCapabilitiesIncludeAny("baremetal", "build"),
+					},
+				},
+				{
+					Name: "spec-baremetal-only",
+					EnvironmentSelector: EnvironmentSelector{
+						Include: OptionalCapabilitiesIncludeAll("baremetal"),
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -548,6 +587,23 @@ func TestSelect(t *testing.T) {
 			want: ExtensionTestSpecs{
 				{
 					Name: "aws-only",
+				},
+			},
+		},
+		{
+			name: "name contains all",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "aws-only-with-some-extra",
+				},
+			},
+			selectFn: NameContainsAll("aws", "some-extra"),
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only-with-some-extra",
 				},
 			},
 		},
