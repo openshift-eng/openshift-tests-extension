@@ -1,6 +1,10 @@
 package flags
 
-import "github.com/spf13/pflag"
+import (
+	"reflect"
+
+	"github.com/spf13/pflag"
+)
 
 type EnvironmentalFlags struct {
 	Platform             string
@@ -63,16 +67,24 @@ func (f *EnvironmentalFlags) BindFlags(fs *pflag.FlagSet) {
 }
 
 func (f *EnvironmentalFlags) IsEmpty() bool {
-	return f.Platform == "" &&
-		f.Network == "" &&
-		f.NetworkStack == "" &&
-		f.Upgrade == "" &&
-		f.Topology == "" &&
-		f.Architecture == "" &&
-		f.ExternalConnectivity == "" &&
-		f.OptionalCapabilities == nil &&
-		len(f.Facts) == 0 &&
-		f.Version == ""
+	v := reflect.ValueOf(*f)
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+
+		switch field.Kind() {
+		case reflect.Slice, reflect.Map:
+			if !field.IsNil() && field.Len() > 0 {
+				return false
+			}
+		default:
+			if !reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface()) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // EnvironmentFlagVersions holds the "Since" version metadata for each flag.
