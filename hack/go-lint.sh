@@ -26,6 +26,6 @@ else
   $DOCKER run --rm \
     --volume "${PWD}:/go/src/github.com/openshift-eng/openshift-tests-extension${VOLUME_OPTION}" \
     --workdir /go/src/github.com/openshift-eng/openshift-tests-extension \
-    docker.io/golangci/golangci-lint:v1.54.2 \
+    docker.io/golangci/golangci-lint:v1.63.4 \
     golangci-lint "${@}"
 fi
