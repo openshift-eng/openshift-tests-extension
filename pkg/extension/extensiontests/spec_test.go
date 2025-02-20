@@ -268,14 +268,16 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 
 func TestExtensionTestSpec_Include(t *testing.T) {
 	testCases := []struct {
-		name string
-		cel  string
-		spec *ExtensionTestSpec
+		name     string
+		cel      string
+		spec     *ExtensionTestSpec
+		expected *ExtensionTestSpec
 	}{
 		{
 			name: "simple OR expression",
 			cel:  Or(PlatformEquals("aws"), NetworkEquals("ovn")),
-			spec: &ExtensionTestSpec{
+			spec: &ExtensionTestSpec{},
+			expected: &ExtensionTestSpec{
 				EnvironmentSelector: EnvironmentSelector{
 					Include: `(platform=="aws" || network=="ovn")`},
 			},
@@ -283,7 +285,8 @@ func TestExtensionTestSpec_Include(t *testing.T) {
 		{
 			name: "simple AND expression",
 			cel:  And(UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64")),
-			spec: &ExtensionTestSpec{
+			spec: &ExtensionTestSpec{},
+			expected: &ExtensionTestSpec{
 				EnvironmentSelector: EnvironmentSelector{
 					Include: `(upgrade=="minor" && topology=="microshift" && architecture=="amd64")`},
 			},
@@ -291,17 +294,30 @@ func TestExtensionTestSpec_Include(t *testing.T) {
 		{
 			name: "complex expression with AND and OR",
 			cel:  And(Or(PlatformEquals("aws"), NetworkEquals("ovn")), And(UpgradeEquals("minor"), TopologyEquals("microshift"), ArchitectureEquals("amd64"))),
-			spec: &ExtensionTestSpec{
+			spec: &ExtensionTestSpec{},
+			expected: &ExtensionTestSpec{
 				EnvironmentSelector: EnvironmentSelector{
 					Include: `((platform=="aws" || network=="ovn") && (upgrade=="minor" && topology=="microshift" && architecture=="amd64"))`},
+			},
+		},
+		{
+			name: "include already exists; is ORed",
+			cel:  Or(PlatformEquals("aws"), NetworkEquals("ovn")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Include: `(platform=="gce")`,
+				},
+			},
+			expected: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Include: `((platform=="gce")) || ((platform=="aws" || network=="ovn"))`},
 			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := &ExtensionTestSpec{}
-			resultingSpec := spec.Include(tc.cel)
-			if diff := cmp.Diff(tc.spec, resultingSpec, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+			resultingSpec := tc.spec.Include(tc.cel)
+			if diff := cmp.Diff(tc.expected, resultingSpec, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
 				t.Errorf("Include returned unexpected resulting spec (-want +got):\n%s", diff)
 			}
 		})
@@ -310,14 +326,16 @@ func TestExtensionTestSpec_Include(t *testing.T) {
 
 func TestExtensionTestSpec_Exclude(t *testing.T) {
 	testCases := []struct {
-		name string
-		cel  string
-		spec *ExtensionTestSpec
+		name     string
+		cel      string
+		spec     *ExtensionTestSpec
+		expected *ExtensionTestSpec
 	}{
 		{
 			name: "simple OR expression",
 			cel:  Or(InstallerEquals("upi"), VersionEquals("4.19")),
-			spec: &ExtensionTestSpec{
+			spec: &ExtensionTestSpec{},
+			expected: &ExtensionTestSpec{
 				EnvironmentSelector: EnvironmentSelector{
 					Exclude: `(installer=="upi" || version=="4.19")`},
 			},
@@ -325,17 +343,30 @@ func TestExtensionTestSpec_Exclude(t *testing.T) {
 		{
 			name: "complex expression utilizing facts",
 			cel:  And(FactEquals("cool.component", "absolutely"), FactEquals("simple.to.use", "true")),
-			spec: &ExtensionTestSpec{
+			spec: &ExtensionTestSpec{},
+			expected: &ExtensionTestSpec{
 				EnvironmentSelector: EnvironmentSelector{
 					Exclude: `((fact_keys.exists(k, k=="cool.component") && facts["cool.component"].matches("absolutely")) && (fact_keys.exists(k, k=="simple.to.use") && facts["simple.to.use"].matches("true")))`},
+			},
+		},
+		{
+			name: "exclude already exists; is ORed",
+			cel:  Or(PlatformEquals("aws"), NetworkEquals("ovn")),
+			spec: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Exclude: `(platform=="gce")`,
+				},
+			},
+			expected: &ExtensionTestSpec{
+				EnvironmentSelector: EnvironmentSelector{
+					Exclude: `((platform=="gce")) || ((platform=="aws" || network=="ovn"))`},
 			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := &ExtensionTestSpec{}
-			resultingSpec := spec.Exclude(tc.cel)
-			if diff := cmp.Diff(tc.spec, resultingSpec, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+			resultingSpec := tc.spec.Exclude(tc.cel)
+			if diff := cmp.Diff(tc.expected, resultingSpec, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
 				t.Errorf("Include returned unexpected resulting spec (-want +got):\n%s", diff)
 			}
 		})
@@ -535,6 +566,12 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 						Include: OptionalCapabilitiesIncludeAll("build"),
 					},
 				},
+				{
+					Name: "spec-no-optional-capabilities-excluded",
+					EnvironmentSelector: EnvironmentSelector{
+						Exclude: NoOptionalCapabilitiesExist(),
+					},
+				},
 			},
 			envFlags: flags.EnvironmentalFlags{OptionalCapabilities: []string{"baremetal"}},
 			want: ExtensionTestSpecs{
@@ -548,6 +585,12 @@ func TestExtensionTestSpecs_FilterByEnvironment(t *testing.T) {
 					Name: "spec-baremetal-only",
 					EnvironmentSelector: EnvironmentSelector{
 						Include: OptionalCapabilitiesIncludeAll("baremetal"),
+					},
+				},
+				{
+					Name: "spec-no-optional-capabilities-excluded",
+					EnvironmentSelector: EnvironmentSelector{
+						Exclude: NoOptionalCapabilitiesExist(),
 					},
 				},
 			},
