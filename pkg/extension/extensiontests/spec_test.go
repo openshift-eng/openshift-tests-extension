@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
 )
