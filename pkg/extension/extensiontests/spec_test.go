@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
@@ -750,6 +751,59 @@ func TestSelect(t *testing.T) {
 	}
 }
 
+func TestMustSelect(t *testing.T) {
+	testCases := []struct {
+		name     string
+		specs    ExtensionTestSpecs
+		selectFn SelectFunction
+		want     ExtensionTestSpecs
+		wantErr  error
+	}{
+		{
+			name: "expected to find specs",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+			selectFn: NameContains("aws"),
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+			},
+		},
+		{
+			name: "expected to not find specs",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+			selectFn: NameContains("azure"),
+			want:     ExtensionTestSpecs{},
+			wantErr:  errors.New("no specs selected with specified SelectFunctions"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := tc.specs.MustSelect(tc.selectFn)
+			if diff := cmp.Diff(err, tc.wantErr, cmp.AllowUnexported(ExtensionTestSpec{}), equateErrorMessage); diff != "" {
+				t.Errorf("MustSelect returned unexpected error (-want +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("MustSelect returned unexpected result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSelectAny(t *testing.T) {
 	testCases := []struct {
 		name      string
@@ -834,6 +888,68 @@ func TestSelectAny(t *testing.T) {
 	}
 }
 
+func TestMustSelectAny(t *testing.T) {
+	testCases := []struct {
+		name      string
+		specs     ExtensionTestSpecs
+		selectFns []SelectFunction
+		want      ExtensionTestSpecs
+		wantErr   error
+	}{
+		{
+			name: "expected to find specs",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "azure-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+			selectFns: []SelectFunction{NameContains("aws"), NameContains("gcp")},
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+		},
+		{
+			name: "not expected to find specs",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "azure-only",
+				},
+				{
+					Name: "gcp-only",
+				},
+			},
+			selectFns: []SelectFunction{NameContains("baremetal"), NameContains("vsphere")},
+			want:      ExtensionTestSpecs{},
+			wantErr:   errors.New("no specs selected with specified SelectFunctions"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := tc.specs.MustSelectAny(tc.selectFns)
+			if diff := cmp.Diff(err, tc.wantErr, cmp.AllowUnexported(ExtensionTestSpec{}), equateErrorMessage); diff != "" {
+				t.Errorf("MustSelect returned unexpected error (-want +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("SelectAny returned unexpected result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSelectAll(t *testing.T) {
 	testCases := []struct {
 		name      string
@@ -907,3 +1023,77 @@ func TestSelectAll(t *testing.T) {
 		})
 	}
 }
+
+func TestMustSelectAll(t *testing.T) {
+	testCases := []struct {
+		name      string
+		specs     ExtensionTestSpecs
+		selectFns []SelectFunction
+		want      ExtensionTestSpecs
+		wantErr   error
+	}{
+		{
+			name: "expected to find specs",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "azure-only",
+				},
+				{
+					Name: "aws-test",
+				},
+			},
+			selectFns: []SelectFunction{NameContains("aws"), NameContains("test")},
+			want: ExtensionTestSpecs{
+				{
+					Name: "aws-test",
+				},
+			},
+		},
+		{
+			name: "not expected to find specs",
+			specs: ExtensionTestSpecs{
+				{
+					Name: "aws-only",
+				},
+				{
+					Name: "azure-only",
+				},
+				{
+					Name: "aws-test",
+				},
+			},
+			selectFns: []SelectFunction{NameContains("baremetal"), NameContains("test")},
+			want:      ExtensionTestSpecs{},
+			wantErr:   errors.New("no specs selected with specified SelectFunctions"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := tc.specs.MustSelectAll(tc.selectFns)
+			if diff := cmp.Diff(err, tc.wantErr, cmp.AllowUnexported(ExtensionTestSpec{}), equateErrorMessage); diff != "" {
+				t.Errorf("MustSelect returned unexpected error (-want +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.want, result, cmp.AllowUnexported(ExtensionTestSpec{})); diff != "" {
+				t.Errorf("SelectAny returned unexpected result (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// equateErrorMessage reports errors to be equal if both are nil
+// or both have the same message.
+var equateErrorMessage = cmp.FilterValues(func(x, y interface{}) bool {
+	_, ok1 := x.(error)
+	_, ok2 := y.(error)
+	return ok1 && ok2
+}, cmp.Comparer(func(x, y interface{}) bool {
+	xe := x.(error)
+	ye := y.(error)
+	if xe == nil || ye == nil {
+		return xe == nil && ye == nil
+	}
+	return xe.Error() == ye.Error()
+}))
