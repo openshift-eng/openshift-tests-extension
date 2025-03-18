@@ -101,6 +101,12 @@ func main() {
 	// Or with "all" (and) matching selections
 	// specs = specs.SelectAll(et.NameContains("slow test"), et.HasTagWithValue("speed", "slow"))
 	//
+	// There are also Must* functions for any of the above flavors of selection
+	// which will return an error if nothing is found
+	// specs, err = specs.MustSelect(et.NameContains("slow test")).AddLabel("SLOW")
+	// if err != nil {
+	//    logrus.Warn("no specs found: %w", err)
+	// }
 	// Test renames
 	//	if spec.Name == "[sig-testing] openshift-tests-extension has a test with a typo" {
 	//		spec.OriginalName = `[sig-testing] openshift-tests-extension has a test with a tpyo`
