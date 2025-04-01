@@ -10,9 +10,9 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
-	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 )
 
 // Walk iterates over all test specs, and executions the function provided. The test spec can be mutated.
@@ -103,6 +103,27 @@ func (specs ExtensionTestSpecs) MustSelectAll(selectFns []SelectFunction) (Exten
 	}
 
 	return filtered, nil
+}
+
+// ModuleTestsOnly ensures that ginkgo tests from vendored sources aren't selected.
+func ModuleTestsOnly() SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		for _, cl := range spec.CodeLocations {
+			if strings.Contains(cl, "/vendor/") {
+				return false
+			}
+		}
+
+		return true
+	}
+}
+
+// AllTestsIncludingVendored is an alternative to ModuleTestsOnly, which would explicitly opt-in
+// to including vendored tests.
+func AllTestsIncludingVendored() SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		return true
+	}
 }
 
 // NameContains returns a function that selects specs whose name contains the provided string
@@ -284,6 +305,7 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 			decls.NewVar("name", decls.String),
 			decls.NewVar("originalName", decls.String),
 			decls.NewVar("labels", decls.NewListType(decls.String)),
+			decls.NewVar("codeLocations", decls.NewListType(decls.String)),
 			decls.NewVar("tags", decls.NewMapType(decls.String, decls.String)),
 		),
 	)
@@ -300,11 +322,12 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 				return nil, err
 			}
 			out, _, err := prg.Eval(map[string]interface{}{
-				"name":         spec.Name,
-				"source":       spec.Source,
-				"originalName": spec.OriginalName,
-				"labels":       spec.Labels.UnsortedList(),
-				"tags":         spec.Tags,
+				"name":          spec.Name,
+				"source":        spec.Source,
+				"originalName":  spec.OriginalName,
+				"labels":        spec.Labels.UnsortedList(),
+				"codeLocations": spec.CodeLocations,
+				"tags":          spec.Tags,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating CEL expression: %v", err)
