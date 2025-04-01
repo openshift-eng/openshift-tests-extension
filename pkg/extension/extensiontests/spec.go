@@ -118,7 +118,7 @@ func ModuleTestsOnly() SelectFunction {
 	}
 }
 
-// AllTestsIncludingVendored is an alternative to the above, which would explicitly opt-in
+// AllTestsIncludingVendored is an alternative to ModuleTestsOnly, which would explicitly opt-in
 // to including vendored tests.
 func AllTestsIncludingVendored() SelectFunction {
 	return func(spec *ExtensionTestSpec) bool {
