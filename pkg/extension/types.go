@@ -7,7 +7,7 @@ import (
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
-const CurrentExtensionAPIVersion = "v1.0"
+const CurrentExtensionAPIVersion = "v1.1"
 
 // Extension represents an extension to openshift-tests.
 type Extension struct {
