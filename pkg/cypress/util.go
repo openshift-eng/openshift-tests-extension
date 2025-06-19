@@ -19,17 +19,11 @@ type TestCase struct {
 	ID       string   `json:"id"`
 }
 
-// BuildExtensionTestSpecsFromCypressMetadata loads test metadata from JSON file
+// BuildExtensionTestSpecsFromCypressMetadata loads test metadata from JSON bytes
 // and creates ExtensionTestSpecs for each test case
-func BuildExtensionTestSpecsFromCypressMetadata(filePath string) (ext.ExtensionTestSpecs, error) {
-	// Read and parse the JSON file
-	fileContent, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read metadata file: %v", err)
-	}
-
+func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionTestSpecs, error) {
 	var testCases []TestCase
-	if err := json.Unmarshal(fileContent, &testCases); err != nil {
+	if err := json.Unmarshal(metadata, &testCases); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal test metadata: %v", err)
 	}
 
