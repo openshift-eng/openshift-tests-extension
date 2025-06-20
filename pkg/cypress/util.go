@@ -7,9 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	ext "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
-	
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
 // TestCase represents the structure of a single test case from the metadata file
