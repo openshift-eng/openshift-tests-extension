@@ -21,6 +21,7 @@ type TestCase struct {
 
 // BuildExtensionTestSpecsFromCypressMetadata loads test metadata from JSON bytes
 // and creates ExtensionTestSpecs for each test case
+// declare metadata variable with //go:embed cypress-test-metadata.json in extension implementation
 func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionTestSpecs, error) {
 	var testCases []TestCase
 	if err := json.Unmarshal(metadata, &testCases); err != nil {
