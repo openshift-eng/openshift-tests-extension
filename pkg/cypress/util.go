@@ -7,8 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	ext "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"k8s.io/apimachinery/pkg/util/sets"
+	ext "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	
 )
 
 // TestCase represents the structure of a single test case from the metadata file
@@ -33,7 +34,7 @@ func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionT
 	for _, tc := range testCases {
 		spec := &ext.ExtensionTestSpec{
 			Name:   tc.Name,
-			Labels: sets.New(tc.Tags...),
+			Labels: sets.New[string](tc.Tags...),
 			Run: func() *ext.ExtensionTestResult {
 				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
 			},
