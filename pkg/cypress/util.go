@@ -35,7 +35,7 @@ func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionT
 			Name:   tc.Name,
 			Labels: sets.New(tc.Tags...),
 			Run: func() *ext.ExtensionTestResult {
-				return runCypressTest(tc.ID, tc.FilePath)
+				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
 			},
 		}
 		specs = append(specs, spec)
@@ -54,14 +54,14 @@ func getTestRootDir() (string, error) {
 }
 
 // runCypressTest executes a single cypress test and returns the result
-func runCypressTest(testID, testFilePath string) *ext.ExtensionTestResult {
+func runCypressTest(testID, testName, testFilePath string) *ext.ExtensionTestResult {
 	// To run cypress tests, we need to setup the env in prow step
 	// please refer to following scripts
 	// xref: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift-extended/web-tests/openshift-extended-web-tests-commands.sh
 	// xref: https://github.com/rioliu-rh/openshift-tests-private/blob/95348a6f5edfc3bc081016a9131c0d2761747a3f/frontend/console-test-frontend.sh
 
 	result := &ext.ExtensionTestResult{
-		Name: testID,
+		Name: testName,
 	}
 
 	rootDir, err := getTestRootDir()
