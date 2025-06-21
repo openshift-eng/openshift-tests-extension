@@ -32,8 +32,9 @@ func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionT
 	var specs []*ext.ExtensionTestSpec
 	for _, tc := range testCases {
 		spec := &ext.ExtensionTestSpec{
-			Name:   tc.Name,
-			Labels: sets.New[string](tc.Tags...),
+			Name:          tc.Name,
+			Labels:        sets.New(tc.Tags...),
+			CodeLocations: []string{tc.FilePath},
 			Run: func() *ext.ExtensionTestResult {
 				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
 			},
