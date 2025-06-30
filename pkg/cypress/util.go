@@ -2,10 +2,12 @@ package cypress
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	ext "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
@@ -17,6 +19,24 @@ type TestCase struct {
 	Tags     []string `json:"tags,omitempty"`
 	FilePath string   `json:"filePath"`
 	ID       string   `json:"id"`
+}
+
+// TestSuite represents a single test suite in JUnit XML output
+type TestSuite struct {
+	Name      string `xml:"name,attr"`
+	Tests     int    `xml:"tests,attr"`
+	TestCases []struct {
+		Name      string `xml:"name,attr"`
+		ClassName string `xml:"classname,attr"`
+		Time      string `xml:"time,attr"`
+		Failure   string `xml:"failure"`
+		Skipped   string `xml:"skipped"`
+	} `xml:"testcase"`
+}
+
+// TestSuites represents the root element of JUnit XML output
+type TestSuites struct {
+	TestSuites []TestSuite `xml:"testsuite"`
 }
 
 // BuildExtensionTestSpecsFromCypressMetadata loads test metadata from JSON bytes
@@ -56,14 +76,18 @@ func getTestRootDir() (string, error) {
 
 // runCypressTest executes a single cypress test and returns the result
 func runCypressTest(testID, testName, testFilePath string) *ext.ExtensionTestResult {
-	// To run cypress tests, we need to setup the env in prow step
-	// please refer to following scripts
-	// xref: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift-extended/web-tests/openshift-extended-web-tests-commands.sh
-	// xref: https://github.com/rioliu-rh/openshift-tests-private/blob/95348a6f5edfc3bc081016a9131c0d2761747a3f/frontend/console-test-frontend.sh
-
 	result := &ext.ExtensionTestResult{
 		Name: testName,
 	}
+
+	// Create temp file for XML output
+	outputFile, err := os.CreateTemp("", "cypress-junit-*.xml")
+	if err != nil {
+		result.Result = ext.ResultFailed
+		result.Error = fmt.Sprintf("failed to create temp file: %v", err)
+		return result
+	}
+	defer os.Remove(outputFile.Name()) // Clean up
 
 	rootDir, err := getTestRootDir()
 	if err != nil {
@@ -73,15 +97,62 @@ func runCypressTest(testID, testName, testFilePath string) *ext.ExtensionTestRes
 	}
 
 	absPath := filepath.Join(rootDir, testFilePath)
-	cmd := exec.Command("npx", "cypress", "run", "--env", fmt.Sprintf("grep=\"%s\"", testID), "--spec", absPath)
-	output, err := cmd.CombinedOutput()
+	cmd := exec.Command("npx", "cypress", "run",
+		"--reporter", "junit",
+		"--reporter-options", fmt.Sprintf("mochaFile=%s", outputFile.Name()),
+		"--env", fmt.Sprintf("grep=\"%s\"", testID),
+		"--spec", absPath)
+
+	// Capture command output
+	cmdOutput, err := cmd.CombinedOutput()
 	if err != nil {
 		result.Result = ext.ResultFailed
-		result.Error = string(output)
+		result.Error = string(cmdOutput)
+		result.Output = string(cmdOutput)
 		return result
 	}
 
-	result.Result = ext.ResultPassed
-	result.Output = string(output)
+	// Parse XML output from Cypress JUnit reporter
+	xmlData, err := os.ReadFile(outputFile.Name())
+	if err != nil {
+		result.Result = ext.ResultFailed
+		result.Error = fmt.Sprintf("failed to read output file: %v", err)
+		result.Output = string(cmdOutput)
+		return result
+	}
+
+	var suites TestSuites
+	if err := xml.Unmarshal(xmlData, &suites); err != nil {
+		result.Result = ext.ResultFailed
+		result.Error = fmt.Sprintf("failed to parse XML: %v", err)
+		result.Output = string(cmdOutput)
+		return result
+	}
+
+	// Process test results from all test suites looking for our specific test case
+	// Cypress JUnit output may contain multiple suites and test cases
+	for _, suite := range suites.TestSuites {
+		for _, testCase := range suite.TestCases {
+			if strings.Contains(testCase.Name, testID) || strings.Contains(testCase.ClassName, testID) {
+				if testCase.Failure != "" {
+					result.Result = ext.ResultFailed
+					result.Error = testCase.Failure
+				} else if testCase.Skipped != "" {
+					result.Result = ext.ResultSkipped
+					result.Error = "test was skipped"
+				} else {
+					result.Result = ext.ResultPassed
+				}
+				result.Output = string(cmdOutput)
+				return result
+			}
+		}
+	}
+
+	// If we get here, the test case wasn't found in Cypress's JUnit output
+	// This could mean the test wasn't executed or the grep filter failed
+	result.Result = ext.ResultFailed
+	result.Error = fmt.Sprintf("test case %s not found in results - check test name and grep filter", testID)
+	result.Output = string(cmdOutput)
 	return result
 }
