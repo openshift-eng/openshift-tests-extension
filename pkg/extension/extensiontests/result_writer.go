@@ -3,6 +3,7 @@ package extensiontests
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -49,11 +50,7 @@ func (w *CompositeResultWriter) Flush() error {
 		}
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("encountered errors from writers: %v", errs)
-	}
-
-	return nil
+	return errors.Join(errs...)
 }
 
 type JUnitResultWriter struct {
@@ -92,7 +89,7 @@ func (w *JUnitResultWriter) Flush() error {
 	defer w.lock.Unlock()
 	data, err := xml.Marshal(w.results.ToJUnit(w.suiteName))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to marshal JUnit XML: %w", err)
 	}
 	if _, err := w.out.Write(data); err != nil {
 		return err
