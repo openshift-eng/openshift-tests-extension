@@ -51,7 +51,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 			}()
 
 			// JUnit writer if needed
-			if len(opts.junitPath) != 0 {
+			if opts.junitPath != "" {
 				junitWriter, err := extensiontests.NewJUnitResultWriter(opts.junitPath, suite.Name)
 				if err != nil {
 					return errors.Wrap(err, "couldn't create junit writer")

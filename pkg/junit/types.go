@@ -41,10 +41,10 @@ type TestSuite struct {
 	Properties []*TestSuiteProperty `xml:"properties,omitempty"`
 
 	// TestCases are the test cases contained in the test suite
-	TestCases []*TestCase `xml:"testcase"`
+	TestCases []*TestCase `xml:"testcases"`
 
 	// Children holds nested test suites
-	Children []*TestSuite `xml:"testsuite"` //nolint
+	Children []*TestSuite `xml:"testsuites"` //nolint
 }
 
 // TestSuiteProperty contains a mapping of a property name to a value

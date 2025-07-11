@@ -87,7 +87,7 @@ func (w *JUnitResultWriter) Write(res *ExtensionTestResult) {
 func (w *JUnitResultWriter) Flush() error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	data, err := xml.Marshal(w.results.ToJUnit(w.suiteName))
+	data, err := xml.MarshalIndent(w.results.ToJUnit(w.suiteName), "", "    ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal JUnit XML: %w", err)
 	}
