@@ -34,7 +34,11 @@ unit:
 	go test ./...
 
 integration: build
-	./framework-tests run-suite framework
+ifeq ($(OPENSHIFT_CI), true)
+	./framework-tests run-suite openshift-tests-extension/framework --junit-path $(ARTIFACT_DIR)/junit_$(shell date +%Y%m%d-%H%M%S).xml
+else
+	./framework-tests run-suite openshift-tests-extension/framework
+endif
 
 lint:
 	./hack/go-lint.sh run ./...
