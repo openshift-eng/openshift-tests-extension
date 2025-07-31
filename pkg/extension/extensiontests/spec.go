@@ -197,6 +197,12 @@ func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
 		close(queue)
 	}()
 
+	// if we have only a single spec to run, we do that differently than running multiple.
+	// multiple specs can run in parallel and do so by exec-ing back into the binary with `run-test` with a single test to execute.
+	// This means that to avoid infinite recursion, when requesting a single test to run
+	// we need to run it in process.
+	runSingleSpec := len(specs) == 1
+
 	// Start consumers
 	var wg sync.WaitGroup
 	for i := 0; i < maxConcurrent; i++ {
@@ -208,7 +214,7 @@ func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
 					beforeEachTask.Run(*spec)
 				}
 
-				res := runSpec(spec)
+				res := runSpec(spec, runSingleSpec)
 				if res.Result == ResultFailed {
 					failures.Add(1)
 				}
@@ -540,9 +546,14 @@ func (spec *ExtensionTestSpec) Exclude(excludeCEL string) *ExtensionTestSpec {
 	return spec
 }
 
-func runSpec(spec *ExtensionTestSpec) *ExtensionTestResult {
+func runSpec(spec *ExtensionTestSpec, runSingleSpec bool) *ExtensionTestResult {
 	startTime := time.Now().UTC()
-	res := spec.Run()
+	var res *ExtensionTestResult
+	if runSingleSpec || spec.RunParallel == nil {
+		res = spec.Run()
+	} else {
+		res = spec.RunParallel()
+	}
 	duration := time.Since(startTime)
 	endTime := startTime.Add(duration).UTC()
 	if res == nil {
