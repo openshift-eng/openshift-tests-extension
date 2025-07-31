@@ -1,6 +1,7 @@
 package ginkgo
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -129,6 +130,10 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 				}
 
 				return result
+			},
+			RunParallel: func() *ext.ExtensionTestResult {
+				// TODO pass through timeout and determine Lifecycle
+				return SpawnProcessToRunTest(context.TODO(), name, 90*time.Minute)
 			},
 		}
 		specs = append(specs, testCase)

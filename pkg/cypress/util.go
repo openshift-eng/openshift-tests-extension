@@ -57,6 +57,10 @@ func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionT
 			Run: func() *ext.ExtensionTestResult {
 				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
 			},
+			RunParallel: func() *ext.ExtensionTestResult {
+				// this is equivalent to before, but potentially could be improved.
+				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
+			},
 		}
 		specs = append(specs, spec)
 	}
