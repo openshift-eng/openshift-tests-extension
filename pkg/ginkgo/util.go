@@ -70,7 +70,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 			Labels:        sets.New[string](spec.Labels()...),
 			CodeLocations: codeLocations,
 			Lifecycle:     GetLifecycle(spec.Labels()),
-			Run: func() *ext.ExtensionTestResult {
+			Run: func(ctx context.Context) *ext.ExtensionTestResult {
 				enforceSerialExecutionForGinkgo.Lock()
 				defer enforceSerialExecutionForGinkgo.Unlock()
 
@@ -131,9 +131,9 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 
 				return result
 			},
-			RunParallel: func() *ext.ExtensionTestResult {
+			RunParallel: func(ctx context.Context) *ext.ExtensionTestResult {
 				// TODO pass through timeout and determine Lifecycle
-				return SpawnProcessToRunTest(context.TODO(), name, 90*time.Minute)
+				return SpawnProcessToRunTest(ctx, name, 90*time.Minute)
 			},
 		}
 		specs = append(specs, testCase)

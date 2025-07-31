@@ -1,6 +1,7 @@
 package extensiontests
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -178,7 +179,7 @@ func (specs ExtensionTestSpecs) Names() []string {
 // are written to the given ResultWriter after each spec has completed execution.  BeforeEach,
 // BeforeAll, AfterEach, AfterAll hooks are executed when specified. "Each" hooks must be thread
 // safe. Returns an error if any test spec failed, indicating the quantity of failures.
-func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
+func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConcurrent int) error {
 	queue := make(chan *ExtensionTestSpec)
 	failures := atomic.Int64{}
 
@@ -214,7 +215,7 @@ func (specs ExtensionTestSpecs) Run(w ResultWriter, maxConcurrent int) error {
 					beforeEachTask.Run(*spec)
 				}
 
-				res := runSpec(spec, runSingleSpec)
+				res := runSpec(ctx, spec, runSingleSpec)
 				if res.Result == ResultFailed {
 					failures.Add(1)
 				}
@@ -546,13 +547,13 @@ func (spec *ExtensionTestSpec) Exclude(excludeCEL string) *ExtensionTestSpec {
 	return spec
 }
 
-func runSpec(spec *ExtensionTestSpec, runSingleSpec bool) *ExtensionTestResult {
+func runSpec(ctx context.Context, spec *ExtensionTestSpec, runSingleSpec bool) *ExtensionTestResult {
 	startTime := time.Now().UTC()
 	var res *ExtensionTestResult
 	if runSingleSpec || spec.RunParallel == nil {
-		res = spec.Run()
+		res = spec.Run(ctx)
 	} else {
-		res = spec.RunParallel()
+		res = spec.RunParallel(ctx)
 	}
 	duration := time.Since(startTime)
 	endTime := startTime.Add(duration).UTC()
