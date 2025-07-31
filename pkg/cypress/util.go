@@ -1,6 +1,7 @@
 package cypress
 
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -54,10 +55,10 @@ func BuildExtensionTestSpecsFromCypressMetadata(metadata []byte) (ext.ExtensionT
 			Name:          tc.Name,
 			Labels:        sets.New(tc.Tags...),
 			CodeLocations: []string{tc.FilePath},
-			Run: func() *ext.ExtensionTestResult {
+			Run: func(ctx context.Context) *ext.ExtensionTestResult {
 				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
 			},
-			RunParallel: func() *ext.ExtensionTestResult {
+			RunParallel: func(ctx context.Context) *ext.ExtensionTestResult {
 				// this is equivalent to before, but potentially could be improved.
 				return runCypressTest(tc.ID, tc.Name, tc.FilePath)
 			},

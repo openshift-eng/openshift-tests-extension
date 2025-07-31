@@ -1,6 +1,7 @@
 package extensiontests
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync/atomic"
@@ -209,7 +210,7 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 			for i := 0; i < tc.numSpecs; i++ {
 				specs = append(specs, &ExtensionTestSpec{
 					Name: fmt.Sprintf("test spec %d", i+1),
-					Run: func() *ExtensionTestResult {
+					Run: func(ctx context.Context) *ExtensionTestResult {
 						return produceTestResult(fmt.Sprintf("test result %d", i+1), 20*time.Second)
 					},
 				})
@@ -241,7 +242,7 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 			}
 
 			// Run the test specs
-			err := specs.Run(NullResultWriter{}, 10)
+			err := specs.Run(context.TODO(), NullResultWriter{}, 10)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
