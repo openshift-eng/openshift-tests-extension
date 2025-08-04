@@ -36,6 +36,7 @@ func configureGinkgo() (*types.SuiteConfig, *types.ReporterConfig, error) {
 
 	// Write output to Stderr
 	ginkgo.GinkgoWriter = ginkgo.NewWriter(os.Stderr)
+	ginkgo.GinkgoLogr = GinkgoLogrFunc(ginkgo.GinkgoWriter)
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
