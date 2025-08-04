@@ -74,7 +74,7 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	}
 
 	fmt.Fprintf(stderr, "Command Error: %v\n", cmdErr)
-	fmt.Fprintf(stderr, "Deserializaion Erroer: %v\n", parseErr)
+	fmt.Fprintf(stderr, "Deserializaion Error: %v\n", parseErr)
 	return newTestResult(testName, result, start, time.Now(), stdout, stderr)
 }
 

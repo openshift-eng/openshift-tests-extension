@@ -40,4 +40,8 @@ var _ = Describe("[sig-testing] example-tests info", Label("framework"), func() 
 		Expect(result.Component.Kind).To(Equal("payload"), "Expected type to be 'payload'")
 		Expect(result.Component.Name).To(Equal("example-tests"), "Expected name to be 'default'")
 	})
+
+	It("should be able to log information", func() {
+		GinkgoLogr.Info("creating resource group", "resourceGroup", "resourceGroupName")
+	})
 })
