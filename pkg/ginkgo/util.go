@@ -96,7 +96,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 				switch {
 				case summary.State == types.SpecStatePassed:
 					result.Result = ext.ResultPassed
-				case summary.State == types.SpecStateSkipped:
+				case summary.State == types.SpecStateSkipped, summary.State == types.SpecStatePending:
 					result.Result = ext.ResultSkipped
 					if len(summary.Failure.Message) > 0 {
 						result.Output = fmt.Sprintf(
