@@ -106,11 +106,13 @@ func (specs ExtensionTestSpecs) MustSelectAll(selectFns []SelectFunction) (Exten
 	return filtered, nil
 }
 
-// ModuleTestsOnly ensures that ginkgo tests from vendored sources aren't selected.
+// ModuleTestsOnly ensures that ginkgo tests from vendored sources aren't selected,
+// except for the Origin extended util packages, that may contain Ginkgo nodes but
+// should not cause a test exclusion.
 func ModuleTestsOnly() SelectFunction {
 	return func(spec *ExtensionTestSpec) bool {
 		for _, cl := range spec.CodeLocations {
-			if strings.Contains(cl, "/vendor/") {
+			if strings.Contains(cl, "/vendor/") && !strings.Contains(cl, "github.com/openshift/origin/test/extended/util") {
 				return false
 			}
 		}
