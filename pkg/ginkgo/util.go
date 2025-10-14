@@ -126,6 +126,17 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 					}
 					errors = append(errors, fmt.Sprintf("fail [%s:%d]: %s", lastFilenameSegment(summary.Failure.Location.FileName), summary.Failure.Location.LineNumber, summary.Failure.Message))
 					result.Error = strings.Join(errors, "\n")
+				case summary.State == types.SpecStateTimedout:
+					result.Result = ext.ResultFailed
+					var errors []string
+					for _, additionalFailure := range summary.AdditionalFailures {
+						collectAdditionalFailures(&errors, "  ", additionalFailure.Failure)
+					}
+					if summary.Failure.AdditionalFailure != nil {
+						collectAdditionalFailures(&errors, "  ", summary.Failure.AdditionalFailure.Failure)
+					}
+					errors = append(errors, fmt.Sprintf("fail [%s:%d]: %s", lastFilenameSegment(summary.Failure.Location.FileName), summary.Failure.Location.LineNumber, summary.Failure.Message))
+					result.Error = strings.Join(errors, "\n")
 				default:
 					panic(fmt.Sprintf("test produced unknown outcome: %#v", summary))
 				}
@@ -197,4 +208,22 @@ func lastFilenameSegment(filename string) string {
 		return parts[len(parts)-1]
 	}
 	return filename
+}
+
+func collectAdditionalFailures(errors *[]string, suffix string, failure types.Failure) {
+	if failure.IsZero() {
+		return
+	}
+
+	if len(failure.ForwardedPanic) > 0 {
+		if len(failure.Location.FullStackTrace) > 0 {
+			*errors = append(*errors, fmt.Sprintf("\n%s\n", failure.Location.FullStackTrace))
+		}
+		*errors = append(*errors, fmt.Sprintf("fail [%s:%d]: Test Panicked: %s%s", lastFilenameSegment(failure.Location.FileName), failure.Location.LineNumber, failure.ForwardedPanic, suffix))
+	}
+	*errors = append(*errors, fmt.Sprintf("fail [%s:%d] %s%s", lastFilenameSegment(failure.Location.FileName), failure.Location.LineNumber, failure.Message, suffix))
+
+	if failure.AdditionalFailure != nil {
+		collectAdditionalFailures(errors, "  ", failure.AdditionalFailure.Failure)
+	}
 }
