@@ -115,7 +115,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 							summary.Failure.ForwardedPanic,
 						)
 					}
-				case summary.State == types.SpecStateFailed, summary.State == types.SpecStatePanicked, summary.State == types.SpecStateInterrupted:
+				case summary.State == types.SpecStateFailed, summary.State == types.SpecStatePanicked, summary.State == types.SpecStateInterrupted, summary.State == types.SpecStateAborted:
 					result.Result = ext.ResultFailed
 					var errors []string
 					if len(summary.Failure.ForwardedPanic) > 0 {
