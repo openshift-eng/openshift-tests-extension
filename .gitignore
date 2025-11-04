@@ -1,3 +1,4 @@
 junit*.xml
 /framework-tests
 /example-tests
+.claude/*local.json

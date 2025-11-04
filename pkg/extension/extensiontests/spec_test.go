@@ -1084,6 +1084,129 @@ func TestMustSelectAll(t *testing.T) {
 	}
 }
 
+func TestExtensionTestSpecs_Run_LifecycleFailures(t *testing.T) {
+	testCases := []struct {
+		name        string
+		specs       ExtensionTestSpecs
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "only informing tests fail - no error",
+			specs: ExtensionTestSpecs{
+				{
+					Name:      "informing-test-1",
+					Lifecycle: LifecycleInforming,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "informing-test-1",
+							Result: ResultFailed,
+						}
+					},
+				},
+				{
+					Name:      "informing-test-2",
+					Lifecycle: LifecycleInforming,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "informing-test-2",
+							Result: ResultFailed,
+						}
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "blocking test fails - returns error",
+			specs: ExtensionTestSpecs{
+				{
+					Name:      "blocking-test",
+					Lifecycle: LifecycleBlocking,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "blocking-test",
+							Result: ResultFailed,
+						}
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "1 tests failed",
+		},
+		{
+			name: "both blocking and informing fail - returns error with counts",
+			specs: ExtensionTestSpecs{
+				{
+					Name:      "blocking-test",
+					Lifecycle: LifecycleBlocking,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "blocking-test",
+							Result: ResultFailed,
+						}
+					},
+				},
+				{
+					Name:      "informing-test",
+					Lifecycle: LifecycleInforming,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "informing-test",
+							Result: ResultFailed,
+						}
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "2 tests failed (1 informing)",
+		},
+		{
+			name: "all tests pass - no error",
+			specs: ExtensionTestSpecs{
+				{
+					Name:      "blocking-test",
+					Lifecycle: LifecycleBlocking,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "blocking-test",
+							Result: ResultPassed,
+						}
+					},
+				},
+				{
+					Name:      "informing-test",
+					Lifecycle: LifecycleInforming,
+					Run: func(ctx context.Context) *ExtensionTestResult {
+						return &ExtensionTestResult{
+							Name:   "informing-test",
+							Result: ResultPassed,
+						}
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.specs.Run(context.TODO(), NullResultWriter{}, 1)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("Expected error but got nil")
+				} else if tc.errContains != "" && !assert.Contains(t, err.Error(), tc.errContains) {
+					t.Errorf("Expected error to contain %q, got %q", tc.errContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error but got: %v", err)
+				}
+			}
+		})
+	}
+}
+
 // equateErrorMessage reports errors to be equal if both are nil
 // or both have the same message.
 var equateErrorMessage = cmp.FilterValues(func(x, y interface{}) bool {
