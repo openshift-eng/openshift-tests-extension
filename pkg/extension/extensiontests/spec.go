@@ -3,6 +3,7 @@ package extensiontests
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -183,7 +184,8 @@ func (specs ExtensionTestSpecs) Names() []string {
 // safe. Returns an error if any test spec failed, indicating the quantity of failures.
 func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConcurrent int) error {
 	queue := make(chan *ExtensionTestSpec)
-	failures := atomic.Int64{}
+	terminalFailures := atomic.Int64{}
+	nonTerminalFailures := atomic.Int64{}
 
 	// Execute beforeAll
 	for _, spec := range specs {
@@ -219,7 +221,11 @@ func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConc
 
 				res := runSpec(ctx, spec, runSingleSpec)
 				if res.Result == ResultFailed {
-					failures.Add(1)
+					if res.Lifecycle.IsTerminal() {
+						terminalFailures.Add(1)
+					} else {
+						nonTerminalFailures.Add(1)
+					}
 				}
 
 				for _, afterEachTask := range spec.afterEach {
@@ -244,10 +250,22 @@ func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConc
 		}
 	}
 
-	failCount := failures.Load()
-	if failCount > 0 {
-		return fmt.Errorf("%d tests failed", failCount)
+	terminalFailCount := terminalFailures.Load()
+	nonTerminalFailCount := nonTerminalFailures.Load()
+
+	// Non-terminal failures don't cause exit 1, but we still log them
+	if nonTerminalFailCount > 0 {
+		fmt.Fprintf(os.Stderr, "%d informing tests failed (not terminal)\n", nonTerminalFailCount)
 	}
+
+	// Only exit with error if terminal lifecycle tests failed
+	if terminalFailCount > 0 {
+		if nonTerminalFailCount > 0 {
+			return fmt.Errorf("%d tests failed (%d informing)", terminalFailCount+nonTerminalFailCount, nonTerminalFailCount)
+		}
+		return fmt.Errorf("%d tests failed", terminalFailCount)
+	}
+
 	return nil
 }
 
