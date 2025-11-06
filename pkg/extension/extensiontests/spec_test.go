@@ -1207,6 +1207,67 @@ func TestExtensionTestSpecs_Run_LifecycleFailures(t *testing.T) {
 	}
 }
 
+func TestModuleTestsOnly(t *testing.T) {
+	testCases := []struct {
+		name string
+		spec *ExtensionTestSpec
+		want bool
+	}{
+		{
+			name: "excluded - all k8s.io/kubernetes/test code locations",
+			spec: &ExtensionTestSpec{
+				Name: "[sig-cli] Kubectl rollout undo undo should rollback and update deployment env",
+				CodeLocations: []string{
+					"k8s.io/kubernetes@v1.33.3/test/e2e/kubectl/rollout.go:40",
+					"set up framework | framework.go:200",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/framework/node/init/init.go:33",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/framework/debug/init/init.go:60",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/framework/metrics/init/init.go:33",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/kubectl/rollout.go:48",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/kubectl/rollout.go:54",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/kubectl/rollout.go:55",
+					"k8s.io/kubernetes@v1.33.3/test/e2e/kubectl/rollout.go:58",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "included - has local code locations, in module format",
+			spec: &ExtensionTestSpec{
+				Name: "[sig-cluster-lifecycle][OCPFeatureGate:VSphereHostVMGroupZonal][platform:vsphere] A Machine in a managed cluster should be placed in the correct vm-host group",
+				CodeLocations: []string{
+					"github.com/openshift/machine-api-operator@v0.0.0/test/e2e/vsphere/hostzonal.go:32",
+					"github.com/openshift/machine-api-operator@v0.0.0/test/e2e/vsphere/hostzonal.go:46",
+					"github.com/openshift/machine-api-operator@v0.0.0/test/e2e/vsphere/hostzonal.go:72",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "included - has local relative path code locations",
+			spec: &ExtensionTestSpec{
+				Name: "[sig-cluster-lifecycle][OCPFeatureGate:VSphereMultiNetworks][platform:vsphere] Managed cluster should new machines should pass multi network tests",
+				CodeLocations: []string{
+					"test/e2e/vsphere/multi-nic.go:152",
+					"test/e2e/vsphere/multi-nic.go:171",
+					"test/e2e/vsphere/multi-nic.go:238",
+				},
+			},
+			want: true,
+		},
+	}
+
+	selectFn := ModuleTestsOnly()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := selectFn(tc.spec)
+			if result != tc.want {
+				t.Errorf("ModuleTestsOnly() returned %v, want %v", result, tc.want)
+			}
+		})
+	}
+}
+
 // equateErrorMessage reports errors to be equal if both are nil
 // or both have the same message.
 var equateErrorMessage = cmp.FilterValues(func(x, y interface{}) bool {
