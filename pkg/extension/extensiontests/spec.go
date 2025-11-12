@@ -107,18 +107,32 @@ func (specs ExtensionTestSpecs) MustSelectAll(selectFns []SelectFunction) (Exten
 	return filtered, nil
 }
 
-// ModuleTestsOnly ensures that ginkgo tests from vendored sources aren't selected,
-// except for the Origin extended util packages, that may contain Ginkgo nodes but
-// should not cause a test exclusion.
+// ModuleTestsOnly ensures that ginkgo tests from vendored sources aren't selected. Unfortunately, making
+// use of kubernetes test helpers results in the entire Ginkgo suite being initialized (ginkgo loves global state),
+// so we need to be careful about which tests we select.
+//
+// A test is excluded if ALL of its code locations with full paths are external (vendored or from external test
+// suites). If at least one code location with a full path is from the local module, the test is included, because
+// local tests may legitimately call helper functions from vendored test frameworks.
 func ModuleTestsOnly() SelectFunction {
 	return func(spec *ExtensionTestSpec) bool {
+		hasLocalCode := false
+
 		for _, cl := range spec.CodeLocations {
-			if strings.Contains(cl, "/vendor/") && !strings.Contains(cl, "github.com/openshift/origin/test/extended/util") {
-				return false
+			// Short-form code locations (e.g., "set up framework | framework.go:200") are ignored in this determination.
+			if !strings.Contains(cl, "/") {
+				continue
+			}
+
+			// If this code location is not external (vendored or k8s test), it's local code
+			if !(strings.Contains(cl, "/vendor/") || strings.HasPrefix(cl, "k8s.io/kubernetes")) {
+				hasLocalCode = true
+				break
 			}
 		}
 
-		return true
+		// Include the test only if it has at least one local code location
+		return hasLocalCode
 	}
 }
 
