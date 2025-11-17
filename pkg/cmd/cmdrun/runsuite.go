@@ -102,13 +102,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 				return errors.Wrap(err, "couldn't filter specs")
 			}
 
-			// Use suite's Parallelism if set, otherwise use command-line flag
-			concurrency := opts.concurrencyFlags.MaxConcurency
-			if suite.Parallelism > 0 {
-				concurrency = suite.Parallelism
-			}
-
-			return specs.Run(ctx, compositeWriter, concurrency)
+			return specs.Run(ctx, compositeWriter, opts.concurrencyFlags.MaxConcurency)
 		},
 	}
 	opts.componentFlags.BindFlags(cmd.Flags())

@@ -1,10 +1,8 @@
 package ginkgo
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"sync"
@@ -84,25 +82,15 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 					Name: spec.Text(),
 				}
 
-				// Keep Verbose = true to capture g.By() output
-				reporterConfigCopy := *reporterConfig
-				reporterConfigCopy.Verbose = true
-
-				// Create a buffer to capture g.By() output AND write to stderr for real-time visibility
-				var outputBuffer bytes.Buffer
-				multiWriter := io.MultiWriter(&outputBuffer, os.Stderr)
-				captureWriter := ginkgo.NewWriter(multiWriter)
-
 				var summary types.SpecReport
-				ginkgo.GetSuite().RunSpec(spec, ginkgo.Labels{}, "", cwd, ginkgo.GetFailer(), captureWriter, *suiteConfig,
-					reporterConfigCopy)
+				ginkgo.GetSuite().RunSpec(spec, ginkgo.Labels{}, "", cwd, ginkgo.GetFailer(), ginkgo.GetWriter(), *suiteConfig,
+					*reporterConfig)
 				for _, report := range ginkgo.GetSuite().GetReport().SpecReports {
 					if report.NumAttempts > 0 {
 						summary = report
 					}
 				}
 
-				// Use Ginkgo's pre-separated output - no filtering needed!
 				result.Output = summary.CapturedGinkgoWriterOutput
 				result.Error = summary.CapturedStdOutErr
 
