@@ -85,7 +85,6 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 				}
 
 				// Keep Verbose = true to capture g.By() output
-				// We'll filter out the reporter summary from the captured output later
 				reporterConfigCopy := *reporterConfig
 				reporterConfigCopy.Verbose = true
 
@@ -93,13 +92,6 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 				var outputBuffer bytes.Buffer
 				multiWriter := io.MultiWriter(&outputBuffer, os.Stderr)
 				captureWriter := ginkgo.NewWriter(multiWriter)
-
-				// Temporarily redirect GinkgoWriter to capture output
-				originalWriter := ginkgo.GinkgoWriter
-				ginkgo.GinkgoWriter = captureWriter
-				defer func() {
-					ginkgo.GinkgoWriter = originalWriter
-				}()
 
 				var summary types.SpecReport
 				ginkgo.GetSuite().RunSpec(spec, ginkgo.Labels{}, "", cwd, ginkgo.GetFailer(), captureWriter, *suiteConfig,
@@ -110,10 +102,8 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 					}
 				}
 
-				// Use the captured buffer output instead of CapturedGinkgoWriterOutput
-				// because we redirected GinkgoWriter to our custom buffer
-				// Filter out Ginkgo reporter summary lines to prevent JSON contamination
-				result.Output = filterGinkgoReporterOutput(outputBuffer.String())
+				// Use Ginkgo's pre-separated output - no filtering needed!
+				result.Output = summary.CapturedGinkgoWriterOutput
 				result.Error = summary.CapturedStdOutErr
 
 				switch {
@@ -231,39 +221,6 @@ func lastFilenameSegment(filename string) string {
 		return parts[len(parts)-1]
 	}
 	return filename
-}
-
-// filterGinkgoReporterOutput removes Ginkgo reporter summary lines from output
-// to prevent contamination of JSON output while preserving test's own logging (g.By() calls)
-func filterGinkgoReporterOutput(output string) string {
-	var filtered []string
-	lines := strings.Split(output, "\n")
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Skip Ginkgo reporter summary lines
-		if strings.HasPrefix(trimmed, "Running Suite:") ||
-			strings.HasPrefix(trimmed, "=======") ||
-			strings.HasPrefix(trimmed, "Random Seed:") ||
-			strings.HasPrefix(trimmed, "Will run ") ||
-			strings.HasPrefix(trimmed, "Ran ") ||
-			strings.HasPrefix(trimmed, "SUCCESS!") ||
-			strings.HasPrefix(trimmed, "FAIL!") ||
-			trimmed == "•" || // Progress indicator
-			trimmed == "" && len(filtered) == 0 { // Skip leading empty lines
-			continue
-		}
-
-		filtered = append(filtered, line)
-	}
-
-	// Remove trailing empty lines
-	for len(filtered) > 0 && strings.TrimSpace(filtered[len(filtered)-1]) == "" {
-		filtered = filtered[:len(filtered)-1]
-	}
-
-	return strings.Join(filtered, "\n")
 }
 
 func collectAdditionalFailures(errors *[]string, suffix string, failure types.Failure) {
