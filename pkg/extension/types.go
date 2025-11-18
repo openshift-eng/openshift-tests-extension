@@ -1,9 +1,11 @@
 package extension
 
 import (
+	"context"
 	"time"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
@@ -19,6 +21,8 @@ type Extension struct {
 	Suites []Suite `json:"suites"`
 
 	Images []Image `json:"images"`
+
+	Configs []Config `json:"configs"`
 
 	// Private data
 	specs         extensiontests.ExtensionTestSpecs
@@ -91,4 +95,17 @@ type Image struct {
 	// Mapped is the image reference that this image is mirrored to by the image mirror tool.
 	// This field should be populated if the mirrored image reference is predetermined by the test extensions.
 	Mapped *Image `json:"mapped,omitempty"`
+}
+
+// Config represents a configuration that can be applied and removed by an extension.
+// Configs can be required by tests and will be automatically managed during test execution.
+type Config struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+
+	// Apply is called to apply the configuration. It receives context and environmental flags.
+	Apply func(context.Context, flags.EnvironmentalFlags) error `json:"-"`
+
+	// Remove is called to remove the configuration. It receives context and environmental flags.
+	Remove func(context.Context, flags.EnvironmentalFlags) error `json:"-"`
 }

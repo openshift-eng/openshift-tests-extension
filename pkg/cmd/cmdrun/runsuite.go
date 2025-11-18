@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
 func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
@@ -21,11 +23,13 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 		componentFlags   *flags.ComponentFlags
 		outputFlags      *flags.OutputFlags
 		concurrencyFlags *flags.ConcurrencyFlags
+		envFlags         *flags.EnvironmentalFlags
 		junitPath        string
 	}{
 		componentFlags:   flags.NewComponentFlags(),
 		outputFlags:      flags.NewOutputFlags(),
 		concurrencyFlags: flags.NewConcurrencyFlags(),
+		envFlags:         flags.NewEnvironmentalFlags(),
 		junitPath:        "",
 	}
 
@@ -97,18 +101,136 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 			}
 			compositeWriter.AddWriter(jsonWriter)
 
-			specs, err := ext.GetSpecs().Filter(suite.Qualifiers)
-			if err != nil {
-				return errors.Wrap(err, "couldn't filter specs")
-			}
+		specs, err := ext.GetSpecs().Filter(suite.Qualifiers)
+		if err != nil {
+			return errors.Wrap(err, "couldn't filter specs")
+		}
 
-			return specs.Run(ctx, compositeWriter, opts.concurrencyFlags.MaxConcurency)
+		// Group specs by required configs
+		specsByConfig := groupSpecsByConfig(specs)
+
+		// Track overall errors
+		var runErrors []error
+
+		// First, run specs that don't require any config
+		if noConfigSpecs, ok := specsByConfig[""]; ok && len(noConfigSpecs) > 0 {
+			fmt.Fprintf(os.Stderr, "Running %d test(s) without config requirements...\n", len(noConfigSpecs))
+			if err := noConfigSpecs.Run(ctx, compositeWriter, opts.concurrencyFlags.MaxConcurency); err != nil {
+				runErrors = append(runErrors, err)
+			}
+			delete(specsByConfig, "")
+		}
+
+		// Then run specs grouped by config
+		for configName, configSpecs := range specsByConfig {
+			if err := runSpecsWithConfig(
+				ctx,
+				ext,
+				configName,
+				configSpecs,
+				compositeWriter,
+				opts.concurrencyFlags.MaxConcurency,
+				*opts.envFlags,
+			); err != nil {
+				runErrors = append(runErrors, err)
+			}
+		}
+
+		// Return combined errors if any
+		if len(runErrors) > 0 {
+			return fmt.Errorf("%d test group(s) failed", len(runErrors))
+		}
+
+		return nil
 		},
 	}
 	opts.componentFlags.BindFlags(cmd.Flags())
 	opts.outputFlags.BindFlags(cmd.Flags())
 	opts.concurrencyFlags.BindFlags(cmd.Flags())
+	opts.envFlags.BindFlags(cmd.Flags())
 	cmd.Flags().StringVarP(&opts.junitPath, "junit-path", "j", opts.junitPath, "write results to junit XML")
 
 	return cmd
+}
+
+// extractRequiredConfigs extracts the set of config names required by the given specs
+func extractRequiredConfigs(specs extensiontests.ExtensionTestSpecs) sets.Set[string] {
+	configs := sets.New[string]()
+	for _, spec := range specs {
+		for label := range spec.Labels {
+			if strings.HasPrefix(label, "Config:") {
+				configName := strings.TrimPrefix(label, "Config:")
+				configs.Insert(configName)
+			}
+		}
+	}
+	return configs
+}
+
+// groupSpecsByConfig groups specs by the configs they require. Specs with no config requirement
+// are grouped under an empty string key.
+func groupSpecsByConfig(specs extensiontests.ExtensionTestSpecs) map[string]extensiontests.ExtensionTestSpecs {
+	groups := make(map[string]extensiontests.ExtensionTestSpecs)
+	
+	for _, spec := range specs {
+		var configName string
+		// Find the config requirement for this spec
+		for label := range spec.Labels {
+			if strings.HasPrefix(label, "Config:") {
+				configName = strings.TrimPrefix(label, "Config:")
+				break
+			}
+		}
+		
+		// Group by config name (empty string for no config)
+		groups[configName] = append(groups[configName], spec)
+	}
+	
+	return groups
+}
+
+// runSpecsWithConfig applies a config, runs the specs, then removes the config
+func runSpecsWithConfig(
+	ctx context.Context,
+	ext *extension.Extension,
+	configName string,
+	specs extensiontests.ExtensionTestSpecs,
+	writer extensiontests.ResultWriter,
+	maxConcurrency int,
+	envFlags flags.EnvironmentalFlags,
+) error {
+	// Find the config
+	var config *extension.Config
+	for i := range ext.Configs {
+		if ext.Configs[i].Name == configName {
+			config = &ext.Configs[i]
+			break
+		}
+	}
+
+	if config == nil {
+		return fmt.Errorf("config %q not found but required by tests", configName)
+	}
+
+	// Apply the config
+	if config.Apply != nil {
+		fmt.Fprintf(os.Stderr, "Applying config %q for %d test(s)...\n", configName, len(specs))
+		if err := config.Apply(ctx, envFlags); err != nil {
+			return fmt.Errorf("failed to apply config %q: %w", configName, err)
+		}
+	}
+
+	// Run the specs
+	err := specs.Run(ctx, writer, maxConcurrency)
+
+	// Remove the config
+	if config.Remove != nil {
+		fmt.Fprintf(os.Stderr, "Removing config %q...\n", configName)
+		if removeErr := config.Remove(ctx, envFlags); removeErr != nil {
+			// Log warning but don't fail the overall run
+			fmt.Fprintf(os.Stderr, "Warning: failed to remove config %q: %v\n", configName, removeErr)
+		}
+	}
+
+	return err
 }

@@ -179,6 +179,10 @@ func Blocking() ginkgo.Labels {
 	return ginkgo.Label(fmt.Sprintf("Lifecycle:%s", ext.LifecycleBlocking))
 }
 
+func RequiresConfig(name string) ginkgo.Labels {
+	return ginkgo.Label(fmt.Sprintf("Config:%s", name))
+}
+
 func GetLifecycle(labels ginkgo.Labels) ext.Lifecycle {
 	for _, label := range labels {
 		res := strings.Split(label, ":")
