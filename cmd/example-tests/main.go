@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
 	e "github.com/openshift-eng/openshift-tests-extension/pkg/extension"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 
 	// If using ginkgo, import your tests here
@@ -45,6 +47,20 @@ func main() {
 		Name: "example/slow",
 		Qualifiers: []string{
 			`labels.exists(l, l=="SLOW")`,
+		},
+	})
+
+	// Register configs that tests may require
+	ext.RegisterConfig(e.Config{
+		Name:        "example-config",
+		Description: "An example configuration demonstrating the config feature",
+		Apply: func(ctx context.Context, envFlags flags.EnvironmentalFlags) error {
+			fmt.Fprintf(os.Stderr, "Example config applied (platform: %s)\n", envFlags.Platform)
+			return nil
+		},
+		Remove: func(ctx context.Context, envFlags flags.EnvironmentalFlags) error {
+			fmt.Fprintf(os.Stderr, "Example config removed\n")
+			return nil
 		},
 	})
 

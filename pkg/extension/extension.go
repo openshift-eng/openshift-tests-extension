@@ -135,6 +135,11 @@ func (e *Extension) RegisterImage(image Image) *Extension {
 	return e
 }
 
+func (e *Extension) RegisterConfig(config Config) *Extension {
+	e.Configs = append(e.Configs, config)
+	return e
+}
+
 func (e *Extension) FindSpecsByName(names ...string) (et.ExtensionTestSpecs, error) {
 	var specs et.ExtensionTestSpecs
 	var notFound []string
