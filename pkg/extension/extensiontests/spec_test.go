@@ -242,7 +242,7 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 			}
 
 			// Run the test specs
-			err := specs.Run(context.TODO(), NullResultWriter{}, 10)
+			_, err := specs.Run(context.TODO(), NullResultWriter{}, 10)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1191,7 +1191,7 @@ func TestExtensionTestSpecs_Run_LifecycleFailures(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.specs.Run(context.TODO(), NullResultWriter{}, 1)
+			_, err := tc.specs.Run(context.TODO(), NullResultWriter{}, 1)
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("Expected error but got nil")
