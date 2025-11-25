@@ -8,13 +8,13 @@ LDFLAGS := -X '$(GO_PKG_NAME)/pkg/version.CommitFromGit=$(GIT_COMMIT)' \
            -X '$(GO_PKG_NAME)/pkg/version.BuildDate=$(BUILD_DATE)' \
            -X '$(GO_PKG_NAME)/pkg/version.GitTreeState=$(GIT_TREE_STATE)'
 
-.PHONY: verify test lint clean unit integration example-tests framework-tests
+.PHONY: verify test lint clean unit integration example-tests framework-tests gotest-example
 
 all: unit build integration
 
 verify: lint
 
-build: example-tests framework-tests
+build: example-tests framework-tests gotest-example
 
 example-tests:
 	# GO_COMPLIANCE_POLICY="exempt_all" must only be used for test related binaries.
@@ -27,6 +27,13 @@ framework-tests:
 	# It prevents various FIPS compliance policies from being applied to this compilation.
 	# Do not set globally.
 	GO_COMPLIANCE_POLICY="exempt_all" go build -ldflags "$(LDFLAGS)" ./cmd/framework-tests/...
+
+gotest-example:
+	go generate ./cmd/gotest-example/...
+	# GO_COMPLIANCE_POLICY="exempt_all" must only be used for test related binaries.
+	# It prevents various FIPS compliance policies from being applied to this compilation.
+	# Do not set globally.
+	GO_COMPLIANCE_POLICY="exempt_all" go build -ldflags "$(LDFLAGS)" ./cmd/gotest-example/...
 
 test: unit integration
 
@@ -44,4 +51,4 @@ lint:
 	./hack/go-lint.sh run ./...
 
 clean:
-	rm -f example-tests framework-tests
+	rm -f example-tests framework-tests gotest-example
