@@ -31,9 +31,10 @@ func NewRunTestCommand(registry *extension.Registry) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:          "run-test [-n NAME...] [NAME]",
-		Short:        "Runs tests by name",
-		SilenceUsage: true,
+		Use:           "run-test [-n NAME...] [NAME]",
+		Short:         "Runs tests by name",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancelCause := context.WithCancelCause(context.Background())
 			defer cancelCause(errors.New("exiting"))
