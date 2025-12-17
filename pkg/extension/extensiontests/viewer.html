@@ -63,53 +63,6 @@
             font-size: 14px;
         }
 
-        /* File Drop Zone */
-        .drop-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: 12px;
-            padding: 48px;
-            text-align: center;
-            background: var(--bg-secondary);
-            transition: all 0.2s;
-            cursor: pointer;
-            margin-bottom: 24px;
-        }
-
-        .drop-zone:hover, .drop-zone.drag-over {
-            border-color: var(--accent);
-            background: var(--bg-tertiary);
-        }
-
-        .drop-zone h2 {
-            font-size: 20px;
-            margin-bottom: 8px;
-            color: var(--text-primary);
-        }
-
-        .drop-zone p {
-            color: var(--text-secondary);
-            margin-bottom: 16px;
-        }
-
-        .drop-zone input[type="file"] {
-            display: none;
-        }
-
-        .drop-zone .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background: var(--accent);
-            color: #fff;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .drop-zone .btn:hover {
-            background: var(--accent-hover);
-        }
-
         /* Summary Cards */
         .summary {
             display: grid;
@@ -624,21 +577,12 @@
                     <path d="M9 11l3 3L22 4"/>
                     <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
                 </svg>
-                OpenShift Tests Extension Results Viewer
+                {{ .SuiteName }}
             </h1>
-            <p class="file-info" id="fileInfo">No file loaded</p>
+            <p class="file-info" id="fileInfo"></p>
         </header>
 
-        <div class="drop-zone" id="dropZone">
-            <h2>Load Test Results</h2>
-            <p>Drag and drop a JSON test results file here, or click to browse</p>
-            <label class="btn">
-                Choose File
-                <input type="file" id="fileInput" accept=".json">
-            </label>
-        </div>
-
-        <div id="resultsContainer" class="hidden">
+        <div id="resultsContainer">
             <div class="summary" id="summary">
                 <div class="summary-card total" data-filter="all">
                     <div class="count" id="totalCount">0</div>
@@ -709,7 +653,7 @@
 
     <script>
         // State
-        let rawData = {{ .Data }}
+        let rawData = {{ .Data }};
         let allTests = [];
         let filteredTests = [];
         let currentPage = 1;
@@ -718,8 +662,6 @@
         let maxDuration = 0;
 
         // DOM Elements
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
         const fileInfo = document.getElementById('fileInfo');
         const resultsContainer = document.getElementById('resultsContainer');
         const testList = document.getElementById('testList');
@@ -727,66 +669,14 @@
 
         // Initialize
         function init() {
-            setupDragAndDrop();
             setupFilters();
             setupPagination();
             setupSummaryCards();
-
-            if (rawData) {
-            processData(rawData, 'test-results.json');
-            }
-        }
-
-        // Drag and Drop
-        function setupDragAndDrop() {
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('drag-over');
-            });
-
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('drag-over');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('drag-over');
-                const file = e.dataTransfer.files[0];
-                if (file) loadFile(file);
-            });
-
-            dropZone.addEventListener('click', (e) => {
-                // Avoid double-triggering when clicking the label/button
-                if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
-                    fileInput.click();
-                }
-            });
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files[0]) loadFile(e.target.files[0]);
-            });
-        }
-
-        // Load File
-        function loadFile(file) {
-            if (!file.name.endsWith('.json')) {
-                alert('Please select a JSON file');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    processData(data, file.name);
-                } catch (err) {
-                    alert('Error parsing JSON file: ' + err.message);
-                }
-            };
-            reader.readAsText(file);
+            processData(rawData);
         }
 
         // Process Data
-        function processData(data, filename) {
+        function processData(data) {
             // Handle both array and object with tests property
             allTests = Array.isArray(data) ? data : (data.tests || []);
 
@@ -822,17 +712,13 @@
             maxDuration = Math.max(...allTests.map(t => t.durationMs));
 
             // Update file info
-            fileInfo.textContent = `${filename} - ${allTests.length} tests`;
+            fileInfo.textContent = `${allTests.length} tests`;
 
             // Populate filters
             populateFilters();
 
             // Update counts
             updateCounts();
-
-            // Show results
-            dropZone.classList.add('hidden');
-            resultsContainer.classList.remove('hidden');
 
             // Apply filters and render
             applyFilters();

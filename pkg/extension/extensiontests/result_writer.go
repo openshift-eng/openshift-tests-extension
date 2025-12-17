@@ -124,8 +124,9 @@ func NewJSONResultWriter(out io.Writer, format ResultFormat) (*JSONResultWriter,
 	}
 
 	return &JSONResultWriter{
-		out:    out,
-		format: format,
+		out:     out,
+		format:  format,
+		results: ExtensionTestResults{},
 	}, nil
 }
 

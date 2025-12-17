@@ -114,7 +114,11 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 				return errors.Wrap(err, "couldn't filter specs")
 			}
 
-			results, runErr := specs.Run(ctx, compositeWriter, min(opts.concurrencyFlags.MaxConcurency, suite.Parallelism))
+			concurrency := opts.concurrencyFlags.MaxConcurency
+			if suite.Parallelism > 0 {
+				concurrency = min(concurrency, suite.Parallelism)
+			}
+			results, runErr := specs.Run(ctx, compositeWriter, concurrency)
 			if opts.junitPath != "" {
 				// we want to commit the results to disk regardless of the success or failure of the specs
 				if err := writeResults(opts.junitPath, results); err != nil {
