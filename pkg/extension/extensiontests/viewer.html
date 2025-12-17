@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenShift Tests Extension Results Viewer</title>
+    <title>Results for {{ .SuiteName }}</title>
     <style>
         :root {
             --bg-primary: #0d1117;
@@ -61,6 +61,53 @@
         .file-info {
             color: var(--text-secondary);
             font-size: 14px;
+        }
+
+        /* File Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 48px;
+            text-align: center;
+            background: var(--bg-secondary);
+            transition: all 0.2s;
+            cursor: pointer;
+            margin-bottom: 24px;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: var(--bg-tertiary);
+        }
+
+        .drop-zone h2 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .drop-zone p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .drop-zone input[type="file"] {
+            display: none;
+        }
+
+        .drop-zone .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .drop-zone .btn:hover {
+            background: var(--accent-hover);
         }
 
         /* Summary Cards */
@@ -577,12 +624,21 @@
                     <path d="M9 11l3 3L22 4"/>
                     <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
                 </svg>
-                {{ .SuiteName }}
+                Results for {{ .SuiteName }}
             </h1>
-            <p class="file-info" id="fileInfo"></p>
+            <p class="file-info" id="fileInfo">No file loaded</p>
         </header>
 
-        <div id="resultsContainer">
+        <div class="drop-zone" id="dropZone">
+            <h2>Load Test Results</h2>
+            <p>Drag and drop a JSON test results file here, or click to browse</p>
+            <label class="btn">
+                Choose File
+                <input type="file" id="fileInput" accept=".json">
+            </label>
+        </div>
+
+        <div id="resultsContainer" class="hidden">
             <div class="summary" id="summary">
                 <div class="summary-card total" data-filter="all">
                     <div class="count" id="totalCount">0</div>
@@ -627,11 +683,11 @@
                 <div class="sort-options">
                     <label for="sortBy">Sort by:</label>
                     <select id="sortBy">
+                        <option value="startTime" selected>Start Time</option>
                         <option value="name">Name</option>
                         <option value="duration-desc">Duration (longest first)</option>
                         <option value="duration-asc">Duration (shortest first)</option>
                         <option value="status">Status</option>
-                        <option value="startTime">Start Time</option>
                     </select>
                 </div>
             </div>
@@ -653,15 +709,19 @@
 
     <script>
         // State
-        let rawData = {{ .Data }};
+        let rawData = {{ .Data }}
         let allTests = [];
         let filteredTests = [];
         let currentPage = 1;
         const pageSize = 50;
         let activeStatusFilter = 'all';
-        let maxDuration = 0;
+        let runStartTime = 0;
+        let runEndTime = 0;
+        let totalRunDuration = 0;
 
         // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
         const fileInfo = document.getElementById('fileInfo');
         const resultsContainer = document.getElementById('resultsContainer');
         const testList = document.getElementById('testList');
@@ -669,14 +729,66 @@
 
         // Initialize
         function init() {
+            setupDragAndDrop();
             setupFilters();
             setupPagination();
             setupSummaryCards();
-            processData(rawData);
+
+            if (rawData) {
+            processData(rawData, 'test-results.json');
+            }
+        }
+
+        // Drag and Drop
+        function setupDragAndDrop() {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file) loadFile(file);
+            });
+
+            dropZone.addEventListener('click', (e) => {
+                // Avoid double-triggering when clicking the label/button
+                if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
+                    fileInput.click();
+                }
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) loadFile(e.target.files[0]);
+            });
+        }
+
+        // Load File
+        function loadFile(file) {
+            if (!file.name.endsWith('.json')) {
+                alert('Please select a JSON file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    processData(data, file.name);
+                } catch (err) {
+                    alert('Error parsing JSON file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
         }
 
         // Process Data
-        function processData(data) {
+        function processData(data, filename) {
             // Handle both array and object with tests property
             allTests = Array.isArray(data) ? data : (data.tests || []);
 
@@ -700,25 +812,39 @@
                 }
             });
 
-            // Extract metadata and mark flaky tests
-            allTests = allTests.map(test => ({
-                ...test,
-                durationMs: test.duration || 0,
-                isFlaky: flakyTestNames.has(test.name),
-                displayResult: flakyTestNames.has(test.name) ? 'flaky' : test.result
-            }));
+            // Parse timestamps and extract metadata
+            allTests = allTests.map(test => {
+                const startMs = test.startTime ? new Date(test.startTime.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0;
+                const endMs = test.endTime ? new Date(test.endTime.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0;
+                return {
+                    ...test,
+                    durationMs: test.duration || 0,
+                    startMs: startMs,
+                    endMs: endMs,
+                    isFlaky: flakyTestNames.has(test.name),
+                    displayResult: flakyTestNames.has(test.name) ? 'flaky' : test.result
+                };
+            });
 
-            // Calculate max duration for bars
-            maxDuration = Math.max(...allTests.map(t => t.durationMs));
+            // Calculate overall run timespan
+            const validStartTimes = allTests.filter(t => t.startMs > 0).map(t => t.startMs);
+            const validEndTimes = allTests.filter(t => t.endMs > 0).map(t => t.endMs);
+            runStartTime = validStartTimes.length > 0 ? Math.min(...validStartTimes) : 0;
+            runEndTime = validEndTimes.length > 0 ? Math.max(...validEndTimes) : 0;
+            totalRunDuration = runEndTime - runStartTime;
 
             // Update file info
-            fileInfo.textContent = `${allTests.length} tests`;
+            fileInfo.textContent = `${filename} - ${allTests.length} tests`;
 
             // Populate filters
             populateFilters();
 
             // Update counts
             updateCounts();
+
+            // Show results
+            dropZone.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
 
             // Apply filters and render
             applyFilters();
@@ -821,7 +947,7 @@
                         const order = { failed: 0, flaky: 1, passed: 2, skipped: 3 };
                         return (order[a.displayResult] || 4) - (order[b.displayResult] || 4);
                     case 'startTime':
-                        return (a.startTime || '').localeCompare(b.startTime || '');
+                        return (a.startMs || 0) - (b.startMs || 0);
                     default:
                         return a.name.localeCompare(b.name);
                 }
@@ -864,9 +990,9 @@
                                 <span class="test-meta-item">${formatDuration(test.durationMs)}</span>
                                 ${test.startTime ? `<span class="test-meta-item">${escapeHtml(test.startTime)}</span>` : ''}
                             </div>
-                            ${maxDuration > 0 ? `
+                            ${totalRunDuration > 0 && test.startMs > 0 ? `
                             <div class="duration-bar">
-                                <div class="duration-bar-fill" style="width: ${(test.durationMs / maxDuration) * 100}%"></div>
+                                <div class="duration-bar-fill" style="margin-left: ${((test.startMs - runStartTime) / totalRunDuration) * 100}%; width: ${Math.max((test.durationMs / totalRunDuration) * 100, 0.5)}%"></div>
                             </div>
                             ` : ''}
                         </div>
