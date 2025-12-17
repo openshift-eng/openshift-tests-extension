@@ -162,3 +162,51 @@ func (w *JSONResultWriter) Flush() error {
 
 	return nil
 }
+
+type HTMLResultWriter struct {
+	lock      sync.Mutex
+	testSuite *junit.TestSuite
+	out       *os.File
+	suiteName string
+	path      string
+	results   ExtensionTestResults
+}
+
+func NewHTMLResultWriter(path, suiteName string) (ResultWriter, error) {
+	file, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &HTMLResultWriter{
+		testSuite: &junit.TestSuite{
+			Name: suiteName,
+		},
+		out:       file,
+		suiteName: suiteName,
+		path:      path,
+	}, nil
+}
+
+func (w *HTMLResultWriter) Write(res *ExtensionTestResult) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.results = append(w.results, res)
+}
+
+func (w *HTMLResultWriter) Flush() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	data, err := w.results.ToHTML(w.suiteName)
+	if err != nil {
+		return fmt.Errorf("failed to create result HTML: %w", err)
+	}
+	if _, err := w.out.Write(data); err != nil {
+		return err
+	}
+	if err := w.out.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}

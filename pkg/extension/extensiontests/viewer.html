@@ -709,6 +709,7 @@
 
     <script>
         // State
+        let rawData = {{ .Data }}
         let allTests = [];
         let filteredTests = [];
         let currentPage = 1;
@@ -730,6 +731,10 @@
             setupFilters();
             setupPagination();
             setupSummaryCards();
+
+            if (rawData) {
+            processData(rawData, 'test-results.json');
+            }
         }
 
         // Drag and Drop
