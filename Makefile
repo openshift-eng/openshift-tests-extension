@@ -35,7 +35,8 @@ unit:
 
 integration: build
 ifeq ($(OPENSHIFT_CI), true)
-	./framework-tests run-suite openshift-tests-extension/framework --junit-path $(ARTIFACT_DIR)/junit_$(shell date +%Y%m%d-%H%M%S).xml
+	$(eval TIMESTAMP := $(shell date +%Y%m%d-%H%M%S))
+	./framework-tests run-suite openshift-tests-extension/framework --junit-path $(ARTIFACT_DIR)/junit_$(TIMESTAMP).xml --html-path $(ARTIFACT_DIR)/results-summary-$(TIMESTAMP).html
 else
 	./framework-tests run-suite openshift-tests-extension/framework
 endif
