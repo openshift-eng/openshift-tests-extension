@@ -3,7 +3,10 @@ package framework
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -75,4 +78,39 @@ var _ = Describe("[sig-testing] example-tests run-suite", Label("framework"), fu
 		}
 		Expect(foundTest).To(BeTrue(), "Expected to find a slow test")
 	})*/
+})
+
+var _ = Describe("[sig-testing] example-tests HTML output", Label("framework"), func() {
+	It("should produce a valid HTML artifact", func() {
+		tmpDir, err := os.MkdirTemp("", "html-test")
+		Expect(err).ShouldNot(HaveOccurred())
+		defer os.RemoveAll(tmpDir)
+
+		htmlPath := filepath.Join(tmpDir, "results.html")
+		cmd := exec.Command("./example-tests", "run-suite", "example/fast", "--html-path", htmlPath)
+		_, cmdErr := cmd.Output()
+
+		// Command exits with error due to intentionally failing tests, but HTML should still be produced
+		var exitErr *exec.ExitError
+		ok := errors.As(cmdErr, &exitErr)
+		Expect(ok).To(BeTrue(), "Expected command to exit with a non-zero status")
+
+		// Verify HTML file was created
+		htmlContent, err := os.ReadFile(htmlPath)
+		Expect(err).ShouldNot(HaveOccurred(), "Expected HTML file to be created")
+		Expect(len(htmlContent)).To(BeNumerically(">", 0), "Expected HTML file to have content")
+
+		// Verify it contains expected HTML structure
+		htmlStr := string(htmlContent)
+		Expect(htmlStr).To(ContainSubstring("<!DOCTYPE html>"), "Expected valid HTML doctype")
+		Expect(htmlStr).To(ContainSubstring("Results for example/fast"), "Expected suite name in title")
+		Expect(htmlStr).To(ContainSubstring("<script id=\"test-data\""), "Expected embedded test data")
+
+		// Verify the embedded JSON is valid by checking it doesn't contain unrendered template
+		Expect(htmlStr).NotTo(ContainSubstring("{{ .Data }}"), "Expected template to be rendered")
+		Expect(htmlStr).NotTo(ContainSubstring("{{ .SuiteName }}"), "Expected template to be rendered")
+
+		// Verify test data is embedded
+		Expect(strings.Count(htmlStr, "sig-testing")).To(BeNumerically(">", 0), "Expected test names in HTML")
+	})
 })
