@@ -713,10 +713,10 @@
 
         <div class="drop-zone" id="dropZone">
             <h2>Load Test Results</h2>
-            <p>Drag and drop a JSON test results file here, or click to browse</p>
+            <p>Drag and drop a JSON or JUnit XML test results file here, or click to browse</p>
             <label class="btn">
                 Choose File
-                <input type="file" id="fileInput" accept=".json">
+                <input type="file" id="fileInput" accept=".json,.xml">
             </label>
         </div>
 
@@ -908,21 +908,120 @@
 
         // Load File
         function loadFile(file) {
-            if (!file.name.endsWith('.json')) {
-                alert('Please select a JSON file');
+            if (!file.name.endsWith('.json') && !file.name.endsWith('.xml')) {
+                alert('Please select a JSON or XML file');
                 return;
             }
 
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const data = JSON.parse(e.target.result);
+                    let data;
+                    if (file.name.endsWith('.xml')) {
+                        data = parseJUnitXML(e.target.result);
+                    } else {
+                        data = JSON.parse(e.target.result);
+                    }
                     processData(data, file.name);
                 } catch (err) {
-                    alert('Error parsing JSON file: ' + err.message);
+                    alert('Error parsing file: ' + err.message);
                 }
             };
             reader.readAsText(file);
+        }
+
+        // Parse JUnit XML to internal format
+        function parseJUnitXML(xmlString) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xmlString, 'text/xml');
+
+            // Check for parse errors
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                throw new Error('Invalid XML: ' + parseError.textContent);
+            }
+
+            const tests = [];
+            const testcases = doc.querySelectorAll('testcase');
+
+            testcases.forEach(tc => {
+                const name = tc.getAttribute('name') || '';
+                const timeSeconds = parseFloat(tc.getAttribute('time')) || 0;
+                const startTime = tc.getAttribute('start-time') || '';
+                const endTime = tc.getAttribute('end-time') || '';
+                const lifecycle = tc.getAttribute('lifecycle') || '';
+                const sourceImage = tc.getAttribute('source-image') || '';
+                const sourceBinary = tc.getAttribute('source-binary') || '';
+                const sourceCommit = tc.getAttribute('source-commit') || '';
+
+                // Determine result
+                let result = 'passed';
+                let error = '';
+                let output = '';
+
+                const skipped = tc.querySelector('skipped');
+                const failure = tc.querySelector('failure');
+                const systemOut = tc.querySelector('system-out');
+                const systemErr = tc.querySelector('system-err');
+
+                if (skipped) {
+                    result = 'skipped';
+                    error = skipped.getAttribute('message') || skipped.textContent || '';
+                } else if (failure) {
+                    result = 'failed';
+                    error = failure.getAttribute('message') || '';
+                    const failureText = failure.textContent || '';
+                    if (failureText && failureText !== error) {
+                        error = error ? error + '\n' + failureText : failureText;
+                    }
+                }
+
+                if (systemOut) {
+                    output = systemOut.textContent || '';
+                }
+                if (systemErr) {
+                    const errOutput = systemErr.textContent || '';
+                    if (errOutput) {
+                        error = error ? error + '\n' + errOutput : errOutput;
+                    }
+                }
+
+                // Build source object if any source fields present
+                let source = null;
+                if (sourceImage || sourceBinary || sourceCommit) {
+                    source = {};
+                    if (sourceBinary) source.source_binary = sourceBinary;
+                    if (sourceImage) source.source_image = sourceImage;
+                    if (sourceCommit) source.commit = sourceCommit;
+                }
+
+                // Format timestamps to match expected format
+                const formatTimestamp = (ts) => {
+                    if (!ts) return '';
+                    // Convert ISO format to "YYYY-MM-DD HH:MM:SS UTC" format
+                    try {
+                        const date = new Date(ts);
+                        if (isNaN(date.getTime())) return ts;
+                        return date.toISOString().replace('T', ' ').replace('Z', ' UTC').replace(/\.\d{3}/, '');
+                    } catch (e) {
+                        return ts;
+                    }
+                };
+
+                tests.push({
+                    name: name,
+                    result: result,
+                    lifecycle: lifecycle,
+                    duration: Math.round(timeSeconds * 1000), // Convert to milliseconds
+                    startTime: formatTimestamp(startTime),
+                    endTime: formatTimestamp(endTime),
+                    output: output,
+                    error: error,
+                    source: source
+                });
+            });
+
+            return tests;
         }
 
         // Process Data
