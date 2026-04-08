@@ -114,6 +114,14 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 				return errors.Wrap(err, "couldn't filter specs")
 			}
 
+			if suite.TestTimeout != nil {
+				for _, spec := range specs {
+					if spec.Timeout == 0 {
+						spec.Timeout = *suite.TestTimeout
+					}
+				}
+			}
+
 			concurrency := opts.concurrencyFlags.MaxConcurency
 			if suite.Parallelism > 0 {
 				concurrency = min(concurrency, suite.Parallelism)
