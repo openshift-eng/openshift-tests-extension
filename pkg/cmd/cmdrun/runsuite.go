@@ -25,12 +25,14 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 		concurrencyFlags *flags.ConcurrencyFlags
 		junitPath        string
 		htmlPath         string
+		progress         bool
 	}{
 		componentFlags:   flags.NewComponentFlags(),
 		outputFlags:      flags.NewOutputFlags(),
 		concurrencyFlags: flags.NewConcurrencyFlags(),
 		junitPath:        "",
 		htmlPath:         "",
+		progress:         false,
 	}
 
 	cmd := &cobra.Command{
@@ -39,6 +41,11 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 			"development use. Orchestration parameters, scheduling, isolation, etc are not obeyed, and Ginkgo tests are executed serially.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Set environment variable for progress reporting if flag is set
+			if opts.progress {
+				os.Setenv("OTE_PROGRESS", "true")
+			}
+
 			ctx, cancelCause := context.WithCancelCause(context.Background())
 			defer cancelCause(errors.New("exiting"))
 
@@ -141,6 +148,7 @@ func NewRunSuiteCommand(registry *extension.Registry) *cobra.Command {
 	opts.concurrencyFlags.BindFlags(cmd.Flags())
 	cmd.Flags().StringVarP(&opts.junitPath, "junit-path", "j", opts.junitPath, "write results to junit XML")
 	cmd.Flags().StringVar(&opts.htmlPath, "html-path", opts.htmlPath, "write results to summary HTML")
+	cmd.Flags().BoolVar(&opts.progress, "progress", opts.progress, "show progress reporting during test execution (displays STEP output in real-time)")
 
 	return cmd
 }

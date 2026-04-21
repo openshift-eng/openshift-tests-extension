@@ -19,6 +19,10 @@ import (
 )
 
 func configureGinkgo() (*types.SuiteConfig, *types.ReporterConfig, error) {
+	return configureGinkgoWithProgress(false)
+}
+
+func configureGinkgoWithProgress(showProgress bool) (*types.SuiteConfig, *types.ReporterConfig, error) {
 	if !ginkgo.GetSuite().InPhaseBuildTree() {
 		if err := ginkgo.GetSuite().BuildTree(); err != nil {
 			return nil, nil, errors.Wrapf(err, "couldn't build ginkgo tree")
@@ -32,6 +36,13 @@ func configureGinkgo() (*types.SuiteConfig, *types.ReporterConfig, error) {
 	suiteConfig.Timeout = 24 * time.Hour
 	reporterConfig.NoColor = true
 	reporterConfig.Verbose = true
+
+	// Enable progress reporting if requested via --progress flag or OTE_PROGRESS env var
+	// This shows STEP output as tests run, not just when they complete
+	if showProgress || os.Getenv("OTE_PROGRESS") == "true" {
+		reporterConfig.ShowNodeEvents = true
+	}
+
 	ginkgo.SetReporterConfig(reporterConfig)
 
 	// Write output to Stderr

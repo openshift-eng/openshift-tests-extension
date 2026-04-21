@@ -23,11 +23,13 @@ func NewRunTestCommand(registry *extension.Registry) *cobra.Command {
 		concurrencyFlags *flags.ConcurrencyFlags
 		nameFlags        *flags.NamesFlags
 		outputFlags      *flags.OutputFlags
+		progress         bool
 	}{
 		componentFlags:   flags.NewComponentFlags(),
 		nameFlags:        flags.NewNamesFlags(),
 		outputFlags:      flags.NewOutputFlags(),
 		concurrencyFlags: flags.NewConcurrencyFlags(),
+		progress:         false,
 	}
 
 	cmd := &cobra.Command{
@@ -35,6 +37,11 @@ func NewRunTestCommand(registry *extension.Registry) *cobra.Command {
 		Short:        "Runs tests by name",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Set environment variable for progress reporting if flag is set
+			if opts.progress {
+				os.Setenv("OTE_PROGRESS", "true")
+			}
+
 			ctx, cancelCause := context.WithCancelCause(context.Background())
 			defer cancelCause(errors.New("exiting"))
 
@@ -108,6 +115,7 @@ func NewRunTestCommand(registry *extension.Registry) *cobra.Command {
 	opts.nameFlags.BindFlags(cmd.Flags())
 	opts.outputFlags.BindFlags(cmd.Flags())
 	opts.concurrencyFlags.BindFlags(cmd.Flags())
+	cmd.Flags().BoolVar(&opts.progress, "progress", opts.progress, "show progress reporting during test execution (displays STEP output in real-time)")
 
 	return cmd
 }
