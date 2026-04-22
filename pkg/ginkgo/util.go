@@ -11,7 +11,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 
@@ -21,7 +20,7 @@ import (
 func configureGinkgo() (*types.SuiteConfig, *types.ReporterConfig, error) {
 	if !ginkgo.GetSuite().InPhaseBuildTree() {
 		if err := ginkgo.GetSuite().BuildTree(); err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't build ginkgo tree")
+			return nil, nil, fmt.Errorf("couldn't build ginkgo tree: %w", err)
 		}
 	}
 
@@ -57,7 +56,7 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunc
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get current working directory")
+		return nil, fmt.Errorf("couldn't get current working directory: %w", err)
 	}
 
 	ginkgo.GetSuite().WalkTests(func(name string, spec types.TestSpec) {

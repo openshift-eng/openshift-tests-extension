@@ -2,6 +2,7 @@ package extensiontests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync/atomic"
@@ -11,7 +12,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
