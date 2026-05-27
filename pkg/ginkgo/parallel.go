@@ -19,8 +19,6 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	// longerCtx is used to backstop the process, but leave termination up to us if possible to allow a double interrupt
 	longerCtx, longerCancel := context.WithTimeout(ctx, timeout+15*time.Minute)
 	defer longerCancel()
-	timeoutCtx, shorterCancel := context.WithTimeout(longerCtx, timeout)
-	defer shorterCancel()
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -36,36 +34,29 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 		return newTestResult(testName, extensiontests.ResultFailed, start, time.Now(), stdout, stderr)
 	}
 
+	done := make(chan struct{})
 	go func() {
 		select {
-		// interrupt tests after timeout, and abort if they don't complete quick enough
 		case <-time.After(timeout):
-			if command.Process != nil {
-				// we're not going to do anything with the err
-				_ = command.Process.Signal(syscall.SIGINT)
-			}
-			// if the process appears to be hung a significant amount of time after the timeout
-			// send an ABRT so we get a stack dump
-			select {
-			case <-time.After(time.Minute):
-				if command.Process != nil {
-					// we're not going to do anything with the err
-					_ = command.Process.Signal(syscall.SIGABRT)
-				}
-			case <-timeoutCtx.Done():
-				if command.Process != nil {
-					_ = command.Process.Signal(syscall.SIGABRT)
-				}
-			}
-		case <-timeoutCtx.Done():
-			if command.Process != nil {
-				_ = command.Process.Signal(syscall.SIGINT)
-			}
+		case <-done:
+			return
+		}
+		if command.Process != nil {
+			_ = command.Process.Signal(syscall.SIGINT)
+		}
+		select {
+		case <-time.After(time.Minute):
+		case <-done:
+			return
+		}
+		if command.Process != nil {
+			_ = command.Process.Signal(syscall.SIGABRT)
 		}
 	}()
 
 	result := extensiontests.ResultFailed
 	cmdErr := command.Wait()
+	close(done)
 
 	subcommandResult, parseErr := newTestResultFromOutput(stdout)
 	if parseErr == nil {
@@ -74,7 +65,7 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	}
 
 	fmt.Fprintf(stderr, "Command Error: %v\n", cmdErr)
-	fmt.Fprintf(stderr, "Deserializaion Error: %v\n", parseErr)
+	fmt.Fprintf(stderr, "Deserialization Error: %v\n", parseErr)
 	return newTestResult(testName, result, start, time.Now(), stdout, stderr)
 }
 
