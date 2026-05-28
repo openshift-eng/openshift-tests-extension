@@ -96,7 +96,7 @@ func newTestResultFromOutput(stdout *bytes.Buffer) (*extensiontests.ExtensionTes
 func newTestResult(name string, result extensiontests.Result, start, end time.Time, stdout, stderr *bytes.Buffer) *extensiontests.ExtensionTestResult {
 	duration := end.Sub(start)
 	dbStart := dbtime.DBTime(start)
-	dbEnd := dbtime.DBTime(start)
+	dbEnd := dbtime.DBTime(end)
 	ret := &extensiontests.ExtensionTestResult{
 		Name:      name,
 		Lifecycle: "", // lifecycle is completed one level above this.
