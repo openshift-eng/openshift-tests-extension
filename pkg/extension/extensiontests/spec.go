@@ -217,7 +217,7 @@ func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConc
 	runSingleSpec := len(specs) == 1
 
 	// Create scheduler with isolation-aware scheduling
-	testScheduler := NewScheduler([]*ExtensionTestSpec(specs))
+	scheduler := NewScheduler(specs)
 
 	// Start consumers
 	var wg sync.WaitGroup
@@ -228,36 +228,37 @@ func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConc
 			defer wg.Done()
 			for {
 				// Get next runnable test from scheduler (blocks until available or done)
-				spec := testScheduler.GetNextTestToRun(ctx)
+				spec := scheduler.GetNextTestToRun(ctx)
 				if spec == nil {
 					return // No more tests or context cancelled
 				}
 
-				for _, beforeEachTask := range spec.beforeEach {
-					beforeEachTask.Run(*spec)
-				}
+				func() {
+					defer scheduler.MarkTestComplete(spec)
 
-				res := runSpec(ctx, spec, runSingleSpec)
-				if res.Result == ResultFailed {
-					if res.Lifecycle.IsTerminal() {
-						terminalFailures.Add(1)
-					} else {
-						nonTerminalFailures.Add(1)
+					for _, beforeEachTask := range spec.beforeEach {
+						beforeEachTask.Run(*spec)
 					}
-				}
 
-				for _, afterEachTask := range spec.afterEach {
-					afterEachTask.Run(res)
-				}
+					res := runSpec(ctx, spec, runSingleSpec)
+					if res.Result == ResultFailed {
+						if res.Lifecycle.IsTerminal() {
+							terminalFailures.Add(1)
+						} else {
+							nonTerminalFailures.Add(1)
+						}
+					}
 
-				// We can't assume the runner will set the name of a test; it may not know it. Even if
-				// it does, we may want to modify it (e.g. k8s-tests for annotations currently).
-				res.Name = spec.Name
-				w.Write(res)
-				resultChan <- res
+					for _, afterEachTask := range spec.afterEach {
+						afterEachTask.Run(res)
+					}
 
-				// Mark test complete to release conflicts/taints and unblock waiting tests
-				testScheduler.MarkTestComplete(spec)
+					// We can't assume the runner will set the name of a test; it may not know it. Even if
+					// it does, we may want to modify it (e.g. k8s-tests for annotations currently).
+					res.Name = spec.Name
+					w.Write(res)
+					resultChan <- res
+				}()
 			}
 		}()
 	}

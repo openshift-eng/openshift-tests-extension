@@ -7,8 +7,14 @@ import (
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
+const defaultConflictGroup = "default"
+
 // Scheduler defines the interface for test scheduling.
 // It manages scheduling based on isolation requirements (conflicts, taints, tolerations).
+//
+// Callers must follow a get-once, complete-once protocol: every non-nil spec returned by
+// GetNextTestToRun must eventually be passed to MarkTestComplete exactly once, including
+// when test execution panics.
 type Scheduler interface {
 	// GetNextTestToRun blocks until a test is available, then returns it.
 	// Returns nil when all tests have been distributed (queue is empty) or context is cancelled.
@@ -26,7 +32,7 @@ type Scheduler interface {
 // It maintains an ordered queue of tests and provides thread-safe scheduling operations.
 type testScheduler struct {
 	mu               sync.Mutex
-	cond             *sync.Cond                  // condition variable to signal when tests complete
+	cond             *sync.Cond // condition variable to signal when tests complete
 	tests            []*ExtensionTestSpec
 	runningConflicts map[string]sets.Set[string] // tracks which conflicts are running per group: group -> set of conflicts
 	activeTaints     map[string]int              // tracks how many tests are currently applying each taint
@@ -36,7 +42,7 @@ type testScheduler struct {
 // them based on isolation requirements (conflicts, taints, tolerations).
 func NewScheduler(tests []*ExtensionTestSpec) Scheduler {
 	ts := &testScheduler{
-		tests:            tests,
+		tests:            append([]*ExtensionTestSpec(nil), tests...),
 		runningConflicts: make(map[string]sets.Set[string]),
 		activeTaints:     make(map[string]int),
 	}
@@ -58,7 +64,9 @@ func (ts *testScheduler) GetNextTestToRun(ctx context.Context) *ExtensionTestSpe
 	go func() {
 		select {
 		case <-ctx.Done():
-			ts.cond.Broadcast() // Wake up the waiting goroutine
+			ts.mu.Lock()
+			ts.cond.Broadcast()
+			ts.mu.Unlock()
 		case <-done:
 			// Normal exit, nothing to do
 		}
@@ -117,15 +125,8 @@ func (ts *testScheduler) GetNextTestToRun(ctx context.Context) *ExtensionTestSpe
 	}
 }
 
-// getConflictGroup returns the conflict group for a test.
-// Conflicts are only checked within the same conflict group.
-// This supports future functionality like isolation modes.
-func getConflictGroup(spec *ExtensionTestSpec) string {
-	// Future: could use spec.Resources.Isolation.Mode to determine group
-	if spec.Resources.Isolation.Mode != "" {
-		return spec.Resources.Isolation.Mode
-	}
-	return "default"
+func getConflictGroup(_ *ExtensionTestSpec) string {
+	return defaultConflictGroup
 }
 
 // hasActiveConflict checks if the spec has any conflicts with currently running tests.
@@ -196,4 +197,3 @@ func (ts *testScheduler) MarkTestComplete(spec *ExtensionTestSpec) {
 	// Some blocked tests might now be runnable
 	ts.cond.Broadcast()
 }
-

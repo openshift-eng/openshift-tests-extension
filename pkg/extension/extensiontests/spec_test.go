@@ -144,6 +144,25 @@ func produceTestResult(name string, duration time.Duration) *ExtensionTestResult
 	}
 }
 
+func TestExtensionTestSpecs_Run_IsolationAware(t *testing.T) {
+	runner := newTrackingRunner()
+
+	specs := ExtensionTestSpecs{
+		specWithRunTracking(runner, "test1", Isolation{Conflict: []string{conflictDatabase}}),
+		specWithRunTracking(runner, "test2", Isolation{Conflict: []string{conflictDatabase}}),
+		specWithRunTracking(runner, "test3", Isolation{Conflict: []string{conflictNetwork}}),
+	}
+
+	_, err := specs.Run(context.Background(), NullResultWriter{}, defaultSchedulerTestWorkers)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertAllTestsCompleted(t, runner, 3)
+	assertOverlap(t, runner, "test1", "test2", false, "Run() respects same conflict")
+	assertOverlap(t, runner, "test1", "test3", true, "Run() allows different conflicts")
+}
+
 func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 	testCases := []struct {
 		name               string
