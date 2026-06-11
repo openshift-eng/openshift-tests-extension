@@ -55,4 +55,9 @@ var _ = Describe("[sig-testing] openshift-tests-extension", func() {
 	It("should support test-skips via environment flags", func() {
 		Expect(true).To(BeTrue()) //This doesn't need to do anything special, just exist
 	})
+
+	XIt("should support pending tests", func() {
+		// This test is pending (XIt) and should be reported as skipped, not panic.
+		Expect(true).To(BeTrue())
+	})
 })
