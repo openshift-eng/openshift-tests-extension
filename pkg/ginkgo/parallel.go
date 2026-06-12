@@ -37,11 +37,7 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	}
 
 	go func() {
-		// interrupt after timeout, or exit early if the process finishes first
-		select {
-		case <-time.After(timeout):
-		case <-timeoutCtx.Done():
-		}
+		<-timeoutCtx.Done()
 		if command.Process != nil {
 			_ = command.Process.Signal(syscall.SIGINT)
 		}
