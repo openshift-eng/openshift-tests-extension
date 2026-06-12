@@ -56,6 +56,17 @@ var _ = Describe("[sig-testing] example-tests run-suite", Label("framework"), fu
 		}
 	})
 
+	It("should contain a test that was skipped due to pending", func() {
+		var foundPending bool
+		for _, test := range result {
+			if test.Name == "[sig-testing] openshift-tests-extension should support pending tests" && test.Result == "skipped" {
+				foundPending = true
+				break
+			}
+		}
+		Expect(foundPending).To(BeTrue(), "Expected pending test (XIt) to be reported as skipped")
+	})
+
 	It("fast suite should not have a slow test", func() {
 		foundTest := false
 		for _, test := range result {
