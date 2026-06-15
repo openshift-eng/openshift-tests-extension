@@ -35,6 +35,10 @@ var _ = Describe("[sig-testing] openshift-tests-extension setup", func() {
 })
 
 var _ = Describe("[sig-testing] openshift-tests-extension", func() {
+	It("should print Hello, world!", func() {
+		Expect("Hello, world!").To(Equal("Hello, world!"))
+	})
+
 	It("should support passing tests", func() {
 		Expect(true).To(BeTrue())
 	})

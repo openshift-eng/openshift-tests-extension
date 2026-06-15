@@ -60,10 +60,9 @@ func main() {
 
 	// You can add hooks to run before/after tests. There are BeforeEach, BeforeAll, AfterEach,
 	// and AfterAll. "Each" functions must be thread safe.
-	//
-	// specs.AddBeforeAll(func() {
-	// 	initializeTestFramework()
-	// })
+	specs.AddBeforeAll(func() {
+		fmt.Fprintf(os.Stderr, "\nHello, world!\n\n")
+	})
 	//
 	// specs.AddBeforeEach(func(spec ExtensionTestSpec) {
 	//	if spec.Name == "my test" {
@@ -126,7 +125,12 @@ func main() {
 		Long: "OpenShift Tests Extension Example",
 	}
 
-	root.AddCommand(cmd.DefaultExtensionCommands(registry)...)
+	for _, command := range cmd.DefaultExtensionCommands(registry) {
+		if command.Name() == "run-test" {
+			command = wrapRunTestWithLocalLogging(command)
+		}
+		root.AddCommand(command)
+	}
 
 	if err := func() error {
 		return root.Execute()
