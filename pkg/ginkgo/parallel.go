@@ -75,22 +75,44 @@ func newTestResultFromOutput(stdout *bytes.Buffer) (*extensiontests.ExtensionTes
 		return nil, errors.New("no output from command")
 	}
 
+	data := stdout.Bytes()
+
+	// Ginkgo's default reporter writes its banner (e.g. "Running Suite:...")
+	// to stdout even when GinkgoWriter is redirected to stderr. This non-JSON
+	// text can precede the actual JSON result and break unmarshalling. Strip
+	// any leading bytes before the first '[' or '{' so the JSON parser sees
+	// clean input.
+	if idx := findJSONStart(data); idx > 0 {
+		data = data[idx:]
+	}
+
 	// when the command runs correctly, we get json or json slice output
 	retArray := []extensiontests.ExtensionTestResult{}
-	if arrayItemErr := json.Unmarshal(stdout.Bytes(), &retArray); arrayItemErr == nil {
+	if arrayItemErr := json.Unmarshal(data, &retArray); arrayItemErr == nil {
 		if len(retArray) != 1 {
-			return nil, errors.New("expected 1 result, got %v results")
+			return nil, fmt.Errorf("expected 1 result, got %d results", len(retArray))
 		}
 		return &retArray[0], nil
 	}
 
 	// when the command runs correctly, we get json output
 	ret := &extensiontests.ExtensionTestResult{}
-	if singleItemErr := json.Unmarshal(stdout.Bytes(), ret); singleItemErr != nil {
+	if singleItemErr := json.Unmarshal(data, ret); singleItemErr != nil {
 		return nil, singleItemErr
 	}
 
 	return ret, nil
+}
+
+// findJSONStart returns the index of the first '[' or '{' in data that could
+// be the start of a JSON array or object. Returns -1 if no candidate is found.
+func findJSONStart(data []byte) int {
+	for i, b := range data {
+		if b == '[' || b == '{' {
+			return i
+		}
+	}
+	return -1
 }
 
 func newTestResult(name string, result extensiontests.Result, start, end time.Time, stdout, stderr *bytes.Buffer) *extensiontests.ExtensionTestResult {
