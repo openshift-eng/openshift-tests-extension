@@ -29,10 +29,12 @@ var _ = Describe("[sig-testing] example-tests info", Label("framework"), func() 
 	})
 
 	It("should have the expected suites", func() {
-		Expect(result.Suites).To(HaveLen(3), "expected 3 suites")
+		Expect(result.Suites).To(HaveLen(4), "expected 4 suites")
 		Expect(result.Suites).To(ContainElement(HaveField("Name", Equal("example/tests"))), "Expected to contain a suite with name 'example/tests'")
 		Expect(result.Suites).To(ContainElement(HaveField("Name", Equal("example/fast"))),
 			"Expected to contain a suite with name 'example/fast'")
+		Expect(result.Suites).To(ContainElement(HaveField("Name", Equal("example/pools"))),
+			"Expected to contain a suite with name 'example/pools'")
 	})
 
 	It("should have the correct component information", func() {

@@ -260,6 +260,7 @@ func (specs ExtensionTestSpecs) Run(ctx context.Context, w ResultWriter, maxConc
 					// We can't assume the runner will set the name of a test; it may not know it. Even if
 					// it does, we may want to modify it (e.g. k8s-tests for annotations currently).
 					res.Name = spec.Name
+					res.ResourcePools = spec.Resources.ResourcePools
 					w.Write(res)
 					resultChan <- res
 				}()

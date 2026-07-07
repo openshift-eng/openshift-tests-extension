@@ -12,7 +12,7 @@ import (
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 
 	// If using ginkgo, import your tests here
-	_ "github.com/openshift-eng/openshift-tests-extension/test/example"
+	"github.com/openshift-eng/openshift-tests-extension/test/example"
 )
 
 func main() {
@@ -67,6 +67,17 @@ func main() {
 		Qualifiers: []string{
 			`labels.exists(l, l=="SLOW")`,
 		},
+	})
+
+	// Pool-aware suite: demonstrates resource pool scheduling. The scheduler
+	// ensures parallel test demand never exceeds pool capacity.
+	ext.AddSuite(e.Suite{
+		Name: "example/pools",
+		Qualifiers: []string{
+			`labels.exists(l, l=="POOL-TEST")`,
+		},
+		Parallelism:   4,
+		ResourcePools: map[string]int{"workers": 2},
 	})
 
 	// If using Ginkgo, build test specs automatically
@@ -141,6 +152,7 @@ func main() {
 	// })
 
 	ext.AddSpecs(specs)
+	ext.AddSpecs(example.PoolTestSpecs())
 	registry.Register(ext)
 
 	root := &cobra.Command{

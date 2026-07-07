@@ -104,15 +104,16 @@ var ResultSkipped Result = "skipped"
 var ResultFailed Result = "failed"
 
 type ExtensionTestResult struct {
-	Name      string         `json:"name"`
-	Lifecycle Lifecycle      `json:"lifecycle"`
-	Duration  int64          `json:"duration"`
-	StartTime *dbtime.DBTime `json:"startTime"`
-	EndTime   *dbtime.DBTime `json:"endTime"`
-	Result    Result         `json:"result"`
-	Output    string         `json:"output"`
-	Error     string         `json:"error,omitempty"`
-	Details   []Details      `json:"details,omitempty"`
+	Name          string         `json:"name"`
+	Lifecycle     Lifecycle      `json:"lifecycle"`
+	Duration      int64          `json:"duration"`
+	StartTime     *dbtime.DBTime `json:"startTime"`
+	EndTime       *dbtime.DBTime `json:"endTime"`
+	Result        Result         `json:"result"`
+	Output        string         `json:"output"`
+	Error         string         `json:"error,omitempty"`
+	Details       []Details      `json:"details,omitempty"`
+	ResourcePools map[string]int `json:"resourcePools,omitempty"`
 }
 
 // Details are human-readable messages to further explain skips, timeouts, etc.
