@@ -12,4 +12,7 @@ enhancement](https://github.com/openshift/enhancements/pull/1676).
 See [cmd/example-tests](cmd/example-tests/main.go) for an example of
 how to integrate this with your project.
 
+See [OCI referrers](docs/oci-referrers.md) for distributing an extension
+binary separately from its component image.
+
 ![Sequence diagram](docs/sequence.png)
