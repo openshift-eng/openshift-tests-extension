@@ -2,9 +2,14 @@ package extensiontests
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"reflect"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -165,61 +170,76 @@ func TestExtensionTestSpecs_Run_IsolationAware(t *testing.T) {
 
 func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 	testCases := []struct {
-		name               string
-		expectedBeforeAll  int32
-		expectedBeforeEach int32
-		expectedAfterEach  int32
-		expectedAfterAll   int32
-		numSpecs           int
-		numSpecSets        int
+		name                string
+		expectedBeforeAll   int32
+		expectedBeforeSpawn int32
+		expectedBeforeEach  int32
+		expectedAfterEach   int32
+		expectedAfterAll    int32
+		numSpecs            int
 	}{
 		{
-			name:               "all hooks run - high test count",
-			expectedBeforeAll:  1,
-			expectedBeforeEach: 10000,
-			expectedAfterEach:  10000,
-			expectedAfterAll:   1,
-			numSpecs:           10000,
+			name:                "all hooks run - high test count",
+			expectedBeforeAll:   1,
+			expectedBeforeSpawn: 10000,
+			expectedBeforeEach:  10000,
+			expectedAfterEach:   10000,
+			expectedAfterAll:    1,
+			numSpecs:            10000,
 		},
 		{
-			name:               "no AddBeforeAll",
-			expectedBeforeAll:  0,
-			expectedBeforeEach: 2,
-			expectedAfterEach:  2,
-			expectedAfterAll:   1,
-			numSpecs:           2,
+			name:                "no AddBeforeAll",
+			expectedBeforeAll:   0,
+			expectedBeforeSpawn: 2,
+			expectedBeforeEach:  2,
+			expectedAfterEach:   2,
+			expectedAfterAll:    1,
+			numSpecs:            2,
 		},
 		{
-			name:               "no AddAfterEach",
-			expectedBeforeAll:  1,
-			expectedBeforeEach: 2,
-			expectedAfterEach:  0,
-			expectedAfterAll:   1,
-			numSpecs:           2,
+			name:                "no AddAfterEach",
+			expectedBeforeAll:   1,
+			expectedBeforeSpawn: 2,
+			expectedBeforeEach:  2,
+			expectedAfterEach:   0,
+			expectedAfterAll:    1,
+			numSpecs:            2,
 		},
 		{
-			name:               "only AddAfterAll",
-			expectedBeforeAll:  0,
-			expectedBeforeEach: 0,
-			expectedAfterEach:  0,
-			expectedAfterAll:   1,
-			numSpecs:           2,
+			name:                "only AddAfterAll",
+			expectedBeforeAll:   0,
+			expectedBeforeSpawn: 0,
+			expectedBeforeEach:  0,
+			expectedAfterEach:   0,
+			expectedAfterAll:    1,
+			numSpecs:            2,
 		},
 		{
-			name:               "beforeEach only",
-			expectedBeforeAll:  0,
-			expectedBeforeEach: 2,
-			expectedAfterEach:  0,
-			expectedAfterAll:   0,
-			numSpecs:           2,
+			name:                "beforeEach only",
+			expectedBeforeAll:   0,
+			expectedBeforeSpawn: 0,
+			expectedBeforeEach:  2,
+			expectedAfterEach:   0,
+			expectedAfterAll:    0,
+			numSpecs:            2,
 		},
 		{
-			name:               "beforeAll and afterAll only",
-			expectedBeforeAll:  1,
-			expectedBeforeEach: 0,
-			expectedAfterEach:  0,
-			expectedAfterAll:   1,
-			numSpecs:           2,
+			name:                "beforeSpawn only",
+			expectedBeforeAll:   0,
+			expectedBeforeSpawn: 2,
+			expectedBeforeEach:  0,
+			expectedAfterEach:   0,
+			expectedAfterAll:    0,
+			numSpecs:            2,
+		},
+		{
+			name:                "beforeAll and afterAll only",
+			expectedBeforeAll:   1,
+			expectedBeforeSpawn: 0,
+			expectedBeforeEach:  0,
+			expectedAfterEach:   0,
+			expectedAfterAll:    1,
+			numSpecs:            2,
 		},
 	}
 
@@ -227,21 +247,28 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			specs := ExtensionTestSpecs{}
 			for i := 0; i < tc.numSpecs; i++ {
-				specs = append(specs, &ExtensionTestSpec{
+				spec := &ExtensionTestSpec{
 					Name: fmt.Sprintf("test spec %d", i+1),
 					Run: func(ctx context.Context) *ExtensionTestResult {
 						return produceTestResult(fmt.Sprintf("test result %d", i+1), 20*time.Second)
 					},
-				})
+				}
+				spec.RunParallel = spec.Run
+				specs = append(specs, spec)
 			}
 
 			// Hook invocation counters
-			var beforeAllCount, beforeEachCount, afterEachCount, afterAllCount atomic.Int32
+			var beforeAllCount, beforeSpawnCount, beforeEachCount, afterEachCount, afterAllCount atomic.Int32
 
 			// Set up hooks based on the expected test case
 			if tc.expectedBeforeAll > 0 {
 				specs.AddBeforeAll(func() {
 					beforeAllCount.Add(1)
+				})
+			}
+			if tc.expectedBeforeSpawn > 0 {
+				specs.AddBeforeSpawn(func(_ string, _ *SpawnOptions) {
+					beforeSpawnCount.Add(1)
 				})
 			}
 			if tc.expectedBeforeEach > 0 {
@@ -271,6 +298,10 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 				t.Errorf("Expected BeforeAll to run %d times, but ran %d times", tc.expectedBeforeAll,
 					beforeAllCount.Load())
 			}
+			if beforeSpawnCount.Load() != tc.expectedBeforeSpawn {
+				t.Errorf("Expected BeforeSpawn to run %d times, but ran %d times", tc.expectedBeforeSpawn,
+					beforeSpawnCount.Load())
+			}
 			if beforeEachCount.Load() != tc.expectedBeforeEach {
 				t.Errorf("Expected BeforeEach to run %d times, but ran %d times", tc.expectedBeforeEach,
 					beforeEachCount.Load())
@@ -284,6 +315,404 @@ func TestExtensionTestSpecs_HookExecution(t *testing.T) {
 					afterAllCount.Load())
 			}
 		})
+	}
+}
+
+func TestExtensionTestSpecs_BeforeSpawnSetsEnv(t *testing.T) {
+	var capturedEnv atomic.Value
+	specs := ExtensionTestSpecs{
+		parallelPassingSpec("env-test"),
+		parallelPassingSpec("other"),
+	}
+
+	specs.AddBeforeSpawn(func(_ string, options *SpawnOptions) {
+		options.Env = map[string]string{"INJECTED": "yes"}
+	})
+
+	specs.AddBeforeEach(func(spec ExtensionTestSpec) {
+		if spec.Name == "env-test" {
+			capturedEnv.Store(spec.Env)
+		}
+	})
+
+	_, err := specs.Run(context.TODO(), NullResultWriter{}, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	env, ok := capturedEnv.Load().(map[string]string)
+	if !ok {
+		t.Fatal("BeforeEach did not capture env")
+	}
+	if env["INJECTED"] != "yes" {
+		t.Errorf("expected Env[INJECTED]=yes, got %v", env)
+	}
+}
+
+func TestExtensionTestSpecs_BeforeSpawnRunsBeforeBeforeEach(t *testing.T) {
+	var order []string
+	var mu sync.Mutex
+
+	specs := ExtensionTestSpecs{parallelPassingSpec("order-test"), parallelPassingSpec("other")}
+
+	specs.AddBeforeSpawn(func(name string, _ *SpawnOptions) {
+		if name != "order-test" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, "beforeSpawn")
+	})
+
+	specs.AddBeforeEach(func(spec ExtensionTestSpec) {
+		if spec.Name != "order-test" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, "beforeEach")
+	})
+
+	_, err := specs.Run(context.TODO(), NullResultWriter{}, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(t, []string{"beforeSpawn", "beforeEach"}, order)
+}
+
+func TestExtensionTestSpecs_BeforeSpawnOptionsVisibleInRunParallel(t *testing.T) {
+	type capturedOptions struct {
+		env       map[string]string
+		timeout   time.Duration
+		resources Resources
+	}
+	var captured sync.Map
+
+	makeSpec := func(name string) *ExtensionTestSpec {
+		spec := &ExtensionTestSpec{
+			Name: name,
+			Run: func(ctx context.Context) *ExtensionTestResult {
+				t.Errorf("Run() should not be called for multi-spec suite")
+				return &ExtensionTestResult{Name: name, Result: ResultFailed}
+			},
+		}
+		spec.RunParallel = func(ctx context.Context) *ExtensionTestResult {
+			captured.Store(name, capturedOptions{
+				env:       spec.Env,
+				timeout:   spec.Timeout,
+				resources: spec.Resources,
+			})
+			return &ExtensionTestResult{Name: name, Result: ResultPassed}
+		}
+		return spec
+	}
+
+	specs := ExtensionTestSpecs{makeSpec("spec-a"), makeSpec("spec-b")}
+	for _, spec := range specs {
+		spec.Resources = Resources{
+			Isolation:     Isolation{Conflict: []string{"shared"}},
+			ResourcePools: map[string]int{"workers": 1},
+		}
+	}
+
+	specs.AddBeforeSpawn(func(name string, options *SpawnOptions) {
+		options.Env = map[string]string{"ASSIGNED_TO": name}
+		options.Timeout = time.Minute
+	})
+
+	_, err := specs.Run(
+		context.TODO(),
+		NullResultWriter{},
+		2,
+		WithResourcePoolCapacity(map[string]int{"workers": 2}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, name := range []string{"spec-a", "spec-b"} {
+		val, ok := captured.Load(name)
+		if !ok {
+			t.Fatalf("RunParallel never ran for %s", name)
+		}
+		got := val.(capturedOptions)
+		if got.env["ASSIGNED_TO"] != name {
+			t.Errorf("spec %s: expected Env[ASSIGNED_TO]=%s, got %v", name, name, got.env)
+		}
+		if got.timeout != time.Minute {
+			t.Errorf("spec %s: expected one-minute timeout, got %v", name, got.timeout)
+		}
+		assert.Equal(t, Resources{
+			Isolation:     Isolation{Conflict: []string{"shared"}},
+			ResourcePools: map[string]int{"workers": 1},
+		}, got.resources)
+	}
+}
+
+func TestExtensionTestSpecs_BeforeEachCannotMutateEnvSeenByRunParallel(t *testing.T) {
+	var capturedEnv atomic.Value
+
+	spec := &ExtensionTestSpec{
+		Name: "env-isolation",
+		Run: func(ctx context.Context) *ExtensionTestResult {
+			t.Error("Run() should not be called for multi-spec suite")
+			return &ExtensionTestResult{Name: "env-isolation", Result: ResultFailed}
+		},
+	}
+	spec.RunParallel = func(ctx context.Context) *ExtensionTestResult {
+		capturedEnv.Store(spec.Env)
+		return &ExtensionTestResult{Name: spec.Name, Result: ResultPassed}
+	}
+	// A second spec is required so runSpec takes the RunParallel path.
+	other := &ExtensionTestSpec{
+		Name: "other",
+		Run:  spec.Run,
+	}
+	other.RunParallel = func(ctx context.Context) *ExtensionTestResult {
+		return &ExtensionTestResult{Name: other.Name, Result: ResultPassed}
+	}
+
+	specs := ExtensionTestSpecs{spec, other}
+	specs.AddBeforeSpawn(func(name string, options *SpawnOptions) {
+		options.Env = map[string]string{"ASSIGNED_TO": name}
+	})
+	specs.AddBeforeEach(func(s ExtensionTestSpec) {
+		s.Env["ASSIGNED_TO"] = "tampered"
+		s.Env["EXTRA"] = "from-before-each"
+	})
+
+	_, err := specs.Run(context.TODO(), NullResultWriter{}, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	env, ok := capturedEnv.Load().(map[string]string)
+	if !ok {
+		t.Fatal("RunParallel did not capture env")
+	}
+	if env["ASSIGNED_TO"] != "env-isolation" {
+		t.Errorf("expected Env[ASSIGNED_TO]=env-isolation, got %v", env)
+	}
+	if _, present := env["EXTRA"]; present {
+		t.Errorf("BeforeEach must not add keys to the Env seen by RunParallel, got %v", env)
+	}
+}
+
+func passingSpec(name string) *ExtensionTestSpec {
+	return &ExtensionTestSpec{
+		Name: name,
+		Run: func(ctx context.Context) *ExtensionTestResult {
+			return &ExtensionTestResult{Name: name, Result: ResultPassed}
+		},
+	}
+}
+
+func parallelPassingSpec(name string) *ExtensionTestSpec {
+	spec := passingSpec(name)
+	spec.RunParallel = spec.Run
+	return spec
+}
+
+func TestExtensionTestSpecs_MultipleBeforeSpawnRunInRegistrationOrder(t *testing.T) {
+	var order []string
+	var mu sync.Mutex
+
+	specs := ExtensionTestSpecs{parallelPassingSpec("order-test"), parallelPassingSpec("other")}
+	specs.AddBeforeSpawn(func(name string, options *SpawnOptions) {
+		if name != "order-test" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, "first")
+		options.Env = map[string]string{"FIRST": "1"}
+	})
+	specs.AddBeforeSpawn(func(name string, options *SpawnOptions) {
+		if name != "order-test" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, "second")
+		options.Env["SECOND"] = "2"
+	})
+
+	var capturedEnv atomic.Value
+	specs.AddBeforeEach(func(spec ExtensionTestSpec) {
+		if spec.Name == "order-test" {
+			capturedEnv.Store(spec.Env)
+		}
+	})
+
+	_, err := specs.Run(context.TODO(), NullResultWriter{}, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assert.Equal(t, []string{"first", "second"}, order)
+	env, ok := capturedEnv.Load().(map[string]string)
+	if !ok {
+		t.Fatal("BeforeEach did not capture env")
+	}
+	if env["FIRST"] != "1" || env["SECOND"] != "2" {
+		t.Errorf("expected both hooks to contribute Env, got %v", env)
+	}
+}
+
+func TestExtensionTestSpecs_BeforeSpawnSkippedInSpawnedChild(t *testing.T) {
+	t.Setenv(SpawnedChildEnv, "1")
+
+	var ran atomic.Int32
+	specs := ExtensionTestSpecs{parallelPassingSpec("child-skip"), parallelPassingSpec("other")}
+	specs.AddBeforeSpawn(func(_ string, _ *SpawnOptions) {
+		ran.Add(1)
+	})
+
+	_, err := specs.Run(context.TODO(), NullResultWriter{}, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ran.Load() != 0 {
+		t.Errorf("BeforeSpawn must not run in a spawned run-test child, ran %d times", ran.Load())
+	}
+}
+
+func TestExtensionTestSpecs_BeforeSpawnSkippedWithoutParallelRun(t *testing.T) {
+	var ran atomic.Int32
+	specs := ExtensionTestSpecs{parallelPassingSpec("direct-run-test")}
+	specs.AddBeforeSpawn(func(_ string, _ *SpawnOptions) {
+		ran.Add(1)
+	})
+
+	_, err := specs.Run(context.TODO(), NullResultWriter{}, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ran.Load() != 0 {
+		t.Errorf("BeforeSpawn must not run when the spec executes in-process, ran %d times", ran.Load())
+	}
+}
+
+const (
+	customRunnerChildEnv = "OTE_TEST_CUSTOM_RUNNER_CHILD"
+	customRunnerLogEnv   = "OTE_TEST_CUSTOM_RUNNER_LOG"
+)
+
+func TestExtensionTestSpecs_CustomSubprocessRunsBeforeSpawnOnlyInParent(t *testing.T) {
+	logPaths := map[string]string{
+		"first":  t.TempDir() + "/first.log",
+		"second": t.TempDir() + "/second.log",
+	}
+	hookErrs := make(chan error, len(logPaths))
+	makeSpec := func(name string) *ExtensionTestSpec {
+		spec := passingSpec(name)
+		logPath := logPaths[name]
+		spec.RunParallel = func(ctx context.Context) *ExtensionTestResult {
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestExtensionTestSpecs_CustomSubprocessChild$")
+			cmd.Env = append(
+				os.Environ(),
+				customRunnerChildEnv+"=1",
+				customRunnerLogEnv+"="+logPath,
+				SpawnedChildEnv+"=1",
+			)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return &ExtensionTestResult{Name: name, Result: ResultFailed, Error: fmt.Sprintf("%v: %s", err, output)}
+			}
+			return &ExtensionTestResult{Name: name, Result: ResultPassed}
+		}
+		return spec
+	}
+
+	specs := ExtensionTestSpecs{makeSpec("first"), makeSpec("second")}
+	specs.AddBeforeSpawn(func(name string, _ *SpawnOptions) {
+		if err := appendHookEvent(logPaths[name], "parent"); err != nil {
+			hookErrs <- err
+		}
+	})
+
+	if _, err := specs.Run(context.Background(), NullResultWriter{}, 2); err != nil {
+		t.Fatalf("custom subprocess run failed: %v", err)
+	}
+	close(hookErrs)
+	for err := range hookErrs {
+		t.Errorf("recording parent hook: %v", err)
+	}
+	for name, logPath := range logPaths {
+		data, err := os.ReadFile(logPath)
+		if err != nil {
+			t.Fatalf("read %s hook log: %v", name, err)
+		}
+		if got := strings.Fields(string(data)); !reflect.DeepEqual(got, []string{"parent"}) {
+			t.Errorf("%s hook events: got %v, want [parent]", name, got)
+		}
+	}
+}
+
+func TestExtensionTestSpecs_CustomSubprocessChild(t *testing.T) {
+	if os.Getenv(customRunnerChildEnv) != "1" {
+		t.Skip("custom subprocess helper")
+	}
+
+	// Multiple specs force the RunParallel path, proving SpawnedChildEnv rather
+	// than single-spec execution prevents BeforeSpawn from running in the child.
+	specs := ExtensionTestSpecs{
+		parallelPassingSpec("child-first"),
+		parallelPassingSpec("child-second"),
+	}
+	specs.AddBeforeSpawn(func(_ string, _ *SpawnOptions) {
+		if err := appendHookEvent(os.Getenv(customRunnerLogEnv), "child"); err != nil {
+			t.Errorf("recording child hook: %v", err)
+		}
+	})
+	if _, err := specs.Run(context.Background(), NullResultWriter{}, 2); err != nil {
+		t.Fatalf("child run failed: %v", err)
+	}
+}
+
+func appendHookEvent(path, event string) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	_, writeErr := fmt.Fprintln(f, event)
+	closeErr := f.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	return closeErr
+}
+
+func TestExtensionTestSpecs_RunRejectsDuplicateSpecPointerBeforeHooks(t *testing.T) {
+	spec := parallelPassingSpec("duplicate")
+	specs := ExtensionTestSpecs{spec, spec}
+	var beforeSpawnCalls atomic.Int32
+	specs.AddBeforeSpawn(func(_ string, _ *SpawnOptions) {
+		beforeSpawnCalls.Add(1)
+	})
+
+	_, err := specs.Run(context.Background(), NullResultWriter{}, 2)
+	if err == nil || !strings.Contains(err.Error(), "same spec pointer more than once") {
+		t.Fatalf("expected duplicate spec error, got %v", err)
+	}
+	if beforeSpawnCalls.Load() != 0 {
+		t.Fatalf("BeforeSpawn ran before duplicate validation: %d calls", beforeSpawnCalls.Load())
+	}
+}
+
+func TestExtensionTestSpec_EnvOmittedFromJSON(t *testing.T) {
+	spec := ExtensionTestSpec{
+		Name: "json-omit",
+		Env:  map[string]string{"SECRET": "should-not-appear"},
+	}
+	data, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	encoded := string(data)
+	if strings.Contains(encoded, "SECRET") || strings.Contains(encoded, "should-not-appear") {
+		t.Errorf("Env must be omitted from JSON, got %s", encoded)
 	}
 }
 

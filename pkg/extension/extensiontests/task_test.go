@@ -58,3 +58,15 @@ func TestTestResultTask_RunMayMutate(t *testing.T) {
 	task.Run(myRes)
 	assert.Equal(t, myRes.Result, ResultFailed)
 }
+
+func TestBeforeSpawnTask_RunMayMutateOptions(t *testing.T) {
+	options := &SpawnOptions{}
+	task := &BeforeSpawnTask{
+		fn: func(name string, options *SpawnOptions) {
+			assert.Equal(t, "original", name)
+			options.Env = map[string]string{"KEY": "value"}
+		},
+	}
+	task.Run("original", options)
+	assert.Equal(t, map[string]string{"KEY": "value"}, options.Env)
+}

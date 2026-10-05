@@ -79,21 +79,28 @@ func main() {
 	specs.Select(et.NameContains("[sig-testing] openshift-tests-extension should support test-skips via environment flags")).
 		Include(et.PlatformEquals("aws"))
 
-	// You can add hooks to run before/after tests. There are BeforeEach, BeforeAll, AfterEach,
-	// and AfterAll. "Each" functions must be thread safe.
+	// You can add hooks to run before/after tests. There are BeforeAll, BeforeSpawn,
+	// BeforeEach, AfterEach, and AfterAll. "Each" and "Spawn" functions must be thread safe.
 	//
 	// specs.AddBeforeAll(func() {
 	// 	initializeTestFramework()
 	// })
 	//
-	// specs.AddBeforeEach(func(spec ExtensionTestSpec) {
+	// BeforeSpawn runs before RunParallel, not for in-process Run. Ginkgo runners
+	// pass Env to the child automatically.
+	//
+	// specs.AddBeforeSpawn(func(name string, options *et.SpawnOptions) {
+	// 	options.Env = map[string]string{"SLOT": allocateSlot(name)}
+	// })
+	//
+	// specs.AddBeforeEach(func(spec et.ExtensionTestSpec) {
 	//	if spec.Name == "my test" {
 	//		// do stuff
 	//	}
 	// })
 	//
-	// specs.AddAfterEach(func(res *ExtensionTestResult) {
-	// 	if res.Result == ResultFailed && apiTimeoutRegexp.Matches(res.Output) {
+	// specs.AddAfterEach(func(res *et.ExtensionTestResult) {
+	// 	if res.Result == et.ResultFailed && apiTimeoutRegexp.Matches(res.Output) {
 	// 		res.AddDetails("api-timeout", collectDiagnosticInfo())
 	// 	}
 	// })

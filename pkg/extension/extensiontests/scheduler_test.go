@@ -44,8 +44,8 @@ func newTestSpecWithResourcePools(name string, isolation Isolation, pools map[st
 	return &ExtensionTestSpec{
 		Name: name,
 		Resources: Resources{
-			Isolation: isolation,
-			ResourcePools:     pools,
+			Isolation:     isolation,
+			ResourcePools: pools,
 		},
 	}
 }
@@ -1286,5 +1286,130 @@ func TestScheduler_DiagnosticsTypeAssertion(t *testing.T) {
 
 	if _, ok := scheduler.(SchedulerDiagnostics); !ok {
 		t.Error("scheduler should implement SchedulerDiagnostics")
+	}
+}
+
+func TestScheduler_MarkTestCompleteIgnoresPostDispatchIsolationMutation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(*ExtensionTestSpec)
+	}{
+		{
+			name: "nil out conflict slice",
+			mutate: func(spec *ExtensionTestSpec) {
+				spec.Resources.Isolation.Conflict = nil
+			},
+		},
+		{
+			name: "rewrite conflict in place",
+			mutate: func(spec *ExtensionTestSpec) {
+				spec.Resources.Isolation.Conflict[0] = "mutated"
+			},
+		},
+		{
+			name: "truncate conflict slice",
+			mutate: func(spec *ExtensionTestSpec) {
+				spec.Resources.Isolation.Conflict = spec.Resources.Isolation.Conflict[:0]
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			first := newTestSpec("first", Isolation{Conflict: []string{conflictDatabase}})
+			second := newTestSpec("second", Isolation{Conflict: []string{conflictDatabase}})
+			scheduler := mustNewScheduler(t, []*ExtensionTestSpec{first, second})
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			got := scheduler.GetNextTestToRun(ctx)
+			if got == nil || got.Name != "first" {
+				t.Fatalf("expected first spec, got %v", got)
+			}
+
+			tt.mutate(first)
+			scheduler.MarkTestComplete(first)
+
+			got = scheduler.GetNextTestToRun(ctx)
+			if got == nil || got.Name != "second" {
+				t.Fatalf("second spec should run after reservation is released, got %v ctx=%v", got, ctx.Err())
+			}
+		})
+	}
+}
+
+func TestScheduler_MarkTestCompleteIgnoresPostDispatchTaintMutation(t *testing.T) {
+	t.Parallel()
+
+	first := newTestSpec("first", Isolation{Taint: []string{taintGPU}})
+	second := newTestSpec("second", Isolation{})
+	scheduler := mustNewScheduler(t, []*ExtensionTestSpec{first, second})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	got := scheduler.GetNextTestToRun(ctx)
+	if got == nil || got.Name != "first" {
+		t.Fatalf("expected first spec, got %v", got)
+	}
+
+	first.Resources.Isolation.Taint = nil
+	scheduler.MarkTestComplete(first)
+
+	got = scheduler.GetNextTestToRun(ctx)
+	if got == nil || got.Name != "second" {
+		t.Fatalf("second spec should run after taint reservation is released, got %v ctx=%v", got, ctx.Err())
+	}
+}
+
+func TestScheduler_MarkTestCompleteIgnoresPostDispatchPoolMutation(t *testing.T) {
+	t.Parallel()
+
+	first := newTestSpecWithResourcePools("first", Isolation{}, map[string]int{"res": 1})
+	second := newTestSpecWithResourcePools("second", Isolation{}, map[string]int{"res": 1})
+	scheduler := mustNewScheduler(t, []*ExtensionTestSpec{first, second},
+		WithResourcePoolCapacity(map[string]int{"res": 1}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	got := scheduler.GetNextTestToRun(ctx)
+	if got == nil || got.Name != "first" {
+		t.Fatalf("expected first spec, got %v", got)
+	}
+
+	first.Resources.ResourcePools = nil
+	scheduler.MarkTestComplete(first)
+
+	got = scheduler.GetNextTestToRun(ctx)
+	if got == nil || got.Name != "second" {
+		t.Fatalf("second spec should run after pool units are returned, got %v ctx=%v", got, ctx.Err())
+	}
+}
+
+func TestScheduler_DuplicateSpecPointerRejected(t *testing.T) {
+	t.Parallel()
+
+	duplicate := newTestSpec("duplicate", Isolation{})
+	_, err := NewScheduler([]*ExtensionTestSpec{duplicate, duplicate})
+	if err == nil {
+		t.Fatal("expected duplicate spec pointer to be rejected")
+	}
+	if !strings.Contains(err.Error(), "same spec pointer more than once") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestScheduler_NilSpecRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewScheduler([]*ExtensionTestSpec{nil})
+	if err == nil || !strings.Contains(err.Error(), "must not be nil") {
+		t.Fatalf("expected nil spec error, got %v", err)
 	}
 }

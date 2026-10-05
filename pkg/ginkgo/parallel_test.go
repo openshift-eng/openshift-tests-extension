@@ -210,6 +210,168 @@ func TestIntegrationStdoutContamination(t *testing.T) {
 	}
 }
 
+func TestMergeEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     []string
+		extra    map[string]string
+		contains []string
+		length   int
+		wantErr  bool
+	}{
+		{
+			name:     "nil extra returns copy of base",
+			base:     []string{"A=1", "B=2"},
+			extra:    nil,
+			contains: []string{"A=1", "B=2"},
+			length:   2,
+		},
+		{
+			name:     "empty extra returns copy of base",
+			base:     []string{"A=1"},
+			extra:    map[string]string{},
+			contains: []string{"A=1"},
+			length:   1,
+		},
+		{
+			name:     "extra vars appended to base",
+			base:     []string{"A=1"},
+			extra:    map[string]string{"B": "2"},
+			contains: []string{"A=1", "B=2"},
+			length:   2,
+		},
+		{
+			name:     "override existing key appends duplicate (last wins in exec.Cmd)",
+			base:     []string{"A=original"},
+			extra:    map[string]string{"A": "override"},
+			contains: []string{"A=original", "A=override"},
+			length:   2,
+		},
+		{
+			name:     "empty base with extra",
+			base:     nil,
+			extra:    map[string]string{"X": "y"},
+			contains: []string{"X=y"},
+			length:   1,
+		},
+		{
+			name:    "empty key is rejected",
+			base:    []string{"A=1"},
+			extra:   map[string]string{"": "x"},
+			wantErr: true,
+		},
+		{
+			name:    "key containing equals is rejected",
+			extra:   map[string]string{"A=B": "C"},
+			wantErr: true,
+		},
+		{
+			name:    "key containing NUL is rejected",
+			extra:   map[string]string{"A\x00B": "C"},
+			wantErr: true,
+		},
+		{
+			name:    "value containing NUL is rejected",
+			extra:   map[string]string{"A": "B\x00C"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := mergeEnv(tt.base, tt.extra)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("mergeEnv() expected an error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("mergeEnv() unexpected error: %v", err)
+			}
+			if len(got) != tt.length {
+				t.Errorf("mergeEnv() returned %d entries, want %d: %v", len(got), tt.length, got)
+			}
+			for _, want := range tt.contains {
+				found := false
+				for _, entry := range got {
+					if entry == want {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("mergeEnv() result missing %q, got %v", want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestEnvWithSpawnedChildMarker(t *testing.T) {
+	tests := []struct {
+		name      string
+		env       map[string]string
+		wantLen   int
+		wantChild string
+	}{
+		{
+			name:      "nil input returns only the marker",
+			env:       nil,
+			wantLen:   1,
+			wantChild: "1",
+		},
+		{
+			name:      "existing keys preserved alongside marker",
+			env:       map[string]string{"FOO": "bar"},
+			wantLen:   2,
+			wantChild: "1",
+		},
+		{
+			name:      "caller-supplied OTE_SPAWNED_CHILD is overridden to 1",
+			env:       map[string]string{"OTE_SPAWNED_CHILD": "no"},
+			wantLen:   1,
+			wantChild: "1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := envWithSpawnedChildMarker(tt.env)
+			if len(got) != tt.wantLen {
+				t.Errorf("envWithSpawnedChildMarker() returned %d entries, want %d: %v", len(got), tt.wantLen, got)
+			}
+			if got["OTE_SPAWNED_CHILD"] != tt.wantChild {
+				t.Errorf("OTE_SPAWNED_CHILD = %q, want %q", got["OTE_SPAWNED_CHILD"], tt.wantChild)
+			}
+		})
+	}
+}
+
+func TestEnvWithSpawnedChildMarkerDoesNotMutateInput(t *testing.T) {
+	input := map[string]string{"A": "1"}
+	_ = envWithSpawnedChildMarker(input)
+	if _, ok := input["OTE_SPAWNED_CHILD"]; ok {
+		t.Error("envWithSpawnedChildMarker mutated the input map")
+	}
+}
+
+func TestMergeEnvDoesNotMutateBase(t *testing.T) {
+	base := []string{"A=1", "B=2"}
+	baseCopy := make([]string, len(base))
+	copy(baseCopy, base)
+
+	if _, err := mergeEnv(base, map[string]string{"C": "3"}); err != nil {
+		t.Fatalf("mergeEnv() unexpected error: %v", err)
+	}
+
+	for i := range base {
+		if base[i] != baseCopy[i] {
+			t.Errorf("mergeEnv mutated base[%d]: got %q, want %q", i, base[i], baseCopy[i])
+		}
+	}
+}
+
 func TestNewTestResultFromOutput(t *testing.T) {
 	tests := []struct {
 		name       string

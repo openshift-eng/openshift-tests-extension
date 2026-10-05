@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,7 +22,18 @@ import (
 // (e.g. via NodeTimeout) before the parent escalates.
 const parentGracePeriod = 2 * time.Minute
 
+// SpawnProcessToRunTestWithEnv is like SpawnProcessToRunTest but merges extra
+// environment variables into the child process on top of os.Environ().
+// A nil or empty env inherits the parent environment plus SpawnedChildEnv.
+func SpawnProcessToRunTestWithEnv(ctx context.Context, testName string, timeout time.Duration, env map[string]string) *extensiontests.ExtensionTestResult {
+	return spawnProcess(ctx, testName, timeout, env)
+}
+
 func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Duration) *extensiontests.ExtensionTestResult {
+	return SpawnProcessToRunTestWithEnv(ctx, testName, timeout, nil)
+}
+
+func spawnProcess(ctx context.Context, testName string, timeout time.Duration, env map[string]string) *extensiontests.ExtensionTestResult {
 	parentTimeout := timeout + parentGracePeriod
 	// longerCtx is used to backstop the process, but leave termination up to us if possible to allow a double interrupt
 	longerCtx, longerCancel := context.WithTimeout(ctx, parentTimeout+15*time.Minute)
@@ -31,12 +44,18 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
+	start := time.Now()
 	command := exec.CommandContext(longerCtx, os.Args[0], "run-test", "--output=json", fmt.Sprintf("--timeout=%s", timeout), testName)
 	command.Stdout = stdout
 	command.Stderr = stderr
+	mergedEnv, err := mergeEnv(os.Environ(), envWithSpawnedChildMarker(env))
+	if err != nil {
+		fmt.Fprintf(stderr, "Invalid child environment: %v\n", err)
+		return newTestResult(testName, extensiontests.ResultFailed, start, time.Now(), stdout, stderr)
+	}
+	command.Env = mergedEnv
 
-	start := time.Now()
-	err := command.Start()
+	err = command.Start()
 	if err != nil {
 		fmt.Fprintf(stderr, "Command Start Error: %v\n", err)
 		return newTestResult(testName, extensiontests.ResultFailed, start, time.Now(), stdout, stderr)
@@ -181,4 +200,32 @@ func newTestResult(name string, result extensiontests.Result, start, end time.Ti
 	}
 
 	return ret
+}
+
+// mergeEnv validates and appends extra environment variables to a base slice
+// (typically os.Environ()). Duplicate keys are not deduplicated — the last value
+// wins per exec.Cmd.Env semantics (Go's os/exec uses the last occurrence).
+func mergeEnv(base []string, extra map[string]string) ([]string, error) {
+	merged := make([]string, len(base), len(base)+len(extra))
+	copy(merged, base)
+	for k, v := range extra {
+		if k == "" {
+			return nil, fmt.Errorf("environment variable name must not be empty")
+		}
+		if strings.ContainsAny(k, "=\x00") {
+			return nil, fmt.Errorf("environment variable name %q contains '=' or NUL", k)
+		}
+		if strings.ContainsRune(v, '\x00') {
+			return nil, fmt.Errorf("environment variable %q contains a NUL value", k)
+		}
+		merged = append(merged, fmt.Sprintf("%s=%s", k, v))
+	}
+	return merged, nil
+}
+
+func envWithSpawnedChildMarker(env map[string]string) map[string]string {
+	out := make(map[string]string, len(env)+1)
+	maps.Copy(out, env)
+	out[extensiontests.SpawnedChildEnv] = "1"
+	return out
 }
