@@ -332,25 +332,46 @@ func TestNewTestResultFromOutput_StdoutPollution(t *testing.T) {
 	}
 }
 
-// TestNewTestResult_RestoresContextOnPollution verifies that when SpawnProcessToRunTest
-// falls back to newTestResult after detecting an invalid result type, the returned
-// result carries the originally requested test name and the stderr diagnostic, not
-// the name/fields parsed from the polluted JSON.
-func TestNewTestResult_RestoresContextOnPollution(t *testing.T) {
-	requestedName := "[sig-apps] example test should succeed"
-	now := time.Now()
-	stderr := bytes.NewBufferString("subprocess produced invalid result type \"\" for test \"[sig-apps] example test should succeed\"; likely JSON pollution in stdout\n")
-	stdout := bytes.NewBufferString(`{"kind":"PodList","apiVersion":"v1","items":[]}` + "\n")
+// TestHandleSubprocessResult exercises the invalid-result branch in handleSubprocessResult,
+// which is the path SpawnProcessToRunTest takes when stdout pollution causes extractJSON to
+// parse the wrong JSON and return Result == "". Verifies the fallback produces a failed
+// result with the correct test name, timing, and diagnostic captured in Error.
+func TestHandleSubprocessResult(t *testing.T) {
+	t.Run("known result types are returned unchanged", func(t *testing.T) {
+		for _, r := range []extensiontests.Result{extensiontests.ResultPassed, extensiontests.ResultFailed, extensiontests.ResultSkipped} {
+			parsed := &extensiontests.ExtensionTestResult{Name: "original-name", Result: r}
+			got := handleSubprocessResult(parsed, "requested-name", time.Time{}, time.Time{}, &bytes.Buffer{}, &bytes.Buffer{})
+			if got != parsed {
+				t.Errorf("result %q: expected same pointer back, got a different result", r)
+			}
+		}
+	})
 
-	result := newTestResult(requestedName, extensiontests.ResultFailed, now, now, stdout, stderr)
+	t.Run("unknown result falls back with correct name, timing, and diagnostic", func(t *testing.T) {
+		requestedName := "[sig-apps] example test should succeed"
+		start := time.Now().Add(-5 * time.Second)
+		end := time.Now()
+		stdout := bytes.NewBufferString(`{"kind":"PodList","apiVersion":"v1","items":[]}` + "\n")
+		stderr := &bytes.Buffer{}
 
-	if result.Name != requestedName {
-		t.Errorf("result.Name = %q, want %q", result.Name, requestedName)
-	}
-	if result.Result != extensiontests.ResultFailed {
-		t.Errorf("result.Result = %q, want %q", result.Result, extensiontests.ResultFailed)
-	}
-	if result.Error == "" {
-		t.Error("result.Error is empty; expected stderr diagnostic to be captured in Error field")
-	}
+		parsed := &extensiontests.ExtensionTestResult{Name: "wrong-name-from-polluted-json", Result: extensiontests.Result("")}
+		result := handleSubprocessResult(parsed, requestedName, start, end, stdout, stderr)
+
+		if result.Name != requestedName {
+			t.Errorf("result.Name = %q, want %q", result.Name, requestedName)
+		}
+		if result.Result != extensiontests.ResultFailed {
+			t.Errorf("result.Result = %q, want %q", result.Result, extensiontests.ResultFailed)
+		}
+		if result.Error == "" {
+			t.Error("result.Error is empty; expected stderr diagnostic to be captured")
+		}
+		wantDiag := "invalid result type"
+		if !bytes.Contains([]byte(result.Error), []byte(wantDiag)) {
+			t.Errorf("result.Error = %q, want it to contain %q", result.Error, wantDiag)
+		}
+		if result.StartTime == nil || result.EndTime == nil {
+			t.Error("result.StartTime or EndTime is nil; timing was not preserved")
+		}
+	})
 }

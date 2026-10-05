@@ -68,20 +68,26 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 	subcommandResult, parseErr := newTestResultFromOutput(stdout)
 	if parseErr == nil {
 		// even if we have a cmdErr, if we were able to parse the result, trust the output.
-		// validate the result type — stdout pollution (e.g. JSON from oc/loki calls) can cause
-		// extractJSON to pick up the wrong JSON, leaving Result as an empty string.
-		switch subcommandResult.Result {
-		case extensiontests.ResultPassed, extensiontests.ResultFailed, extensiontests.ResultSkipped:
-			return subcommandResult
-		default:
-			fmt.Fprintf(stderr, "subprocess produced invalid result type %q for test %q; likely JSON pollution in stdout\n", subcommandResult.Result, testName)
-			return newTestResult(testName, extensiontests.ResultFailed, start, end, stdout, stderr)
-		}
+		return handleSubprocessResult(subcommandResult, testName, start, end, stdout, stderr)
 	}
 
 	fmt.Fprintf(stderr, "Command Error: %v\n", cmdErr)
 	fmt.Fprintf(stderr, "Deserialization Error: %v\n", parseErr)
 	return newTestResult(testName, extensiontests.ResultFailed, start, end, stdout, stderr)
+}
+
+// handleSubprocessResult validates the result type from a parsed subprocess output.
+// If the result type is unknown (e.g. empty string caused by stdout JSON pollution),
+// it writes a diagnostic to stderr and falls back to a properly-constructed failure
+// result using the original test name and timing.
+func handleSubprocessResult(parsed *extensiontests.ExtensionTestResult, testName string, start, end time.Time, stdout, stderr *bytes.Buffer) *extensiontests.ExtensionTestResult {
+	switch parsed.Result {
+	case extensiontests.ResultPassed, extensiontests.ResultFailed, extensiontests.ResultSkipped:
+		return parsed
+	default:
+		fmt.Fprintf(stderr, "subprocess produced invalid result type %q for test %q; likely JSON pollution in stdout\n", parsed.Result, testName)
+		return newTestResult(testName, extensiontests.ResultFailed, start, end, stdout, stderr)
+	}
 }
 
 func newTestResultFromOutput(stdout *bytes.Buffer) (*extensiontests.ExtensionTestResult, error) {
