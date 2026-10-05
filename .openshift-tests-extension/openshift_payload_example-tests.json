@@ -6,6 +6,11 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:17",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:18",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:22"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {}
   },
@@ -16,6 +21,25 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:27",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:28",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:32"
+    ],
+    "lifecycle": "blocking",
+    "environmentSelector": {}
+  },
+  {
+    "name": "[sig-testing] openshift-tests-extension should print Hello, world!",
+    "labels": {},
+    "resources": {
+      "isolation": {}
+    },
+    "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:37",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:38"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {}
   },
@@ -26,6 +50,10 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:37",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:42"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {}
   },
@@ -36,6 +64,10 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:37",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:46"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {}
   },
@@ -46,6 +78,10 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:37",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:50"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {}
   },
@@ -58,6 +94,10 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:37",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:54"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {}
   },
@@ -68,6 +108,10 @@
       "isolation": {}
     },
     "source": "openshift:payload:example-tests",
+    "codeLocations": [
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:37",
+      "/home/dfrazzet/github/openshift-tests-extension/test/example/example.go:59"
+    ],
     "lifecycle": "blocking",
     "environmentSelector": {
       "include": "platform==\"aws\""

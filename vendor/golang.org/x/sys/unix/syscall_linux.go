@@ -663,7 +663,7 @@ func (sa *SockaddrCANJ1939) sockaddr() (unsafe.Pointer, _Socklen, error) {
 //	// previous hash state. Read always reads the current state.
 //	b := make([]byte, 20)
 //	for i := 0; i < 2; i++ {
-//	    io.WriteString(hash, "Hello, world.")
+//	    io.WriteString(hash, "Hello, world!")
 //	    hash.Read(b)
 //	    fmt.Println(hex.EncodeToString(b))
 //	}
