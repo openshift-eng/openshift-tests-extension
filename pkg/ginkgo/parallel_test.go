@@ -3,6 +3,9 @@ package ginkgo
 import (
 	"bytes"
 	"testing"
+	"time"
+
+	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 )
 
 func TestExtractJSON(t *testing.T) {
@@ -287,5 +290,67 @@ func TestNewTestResultFromOutput(t *testing.T) {
 				t.Errorf("result.Result = %q, want %q", result.Result, tt.wantResult)
 			}
 		})
+	}
+}
+
+// TestNewTestResultFromOutput_StdoutPollution documents the root cause of the panic:
+// when a subprocess emits an unrelated JSON object to stdout before the actual test
+// result (e.g. an oc or loki API response), extractJSON picks up the wrong JSON first,
+// returning a parsed ExtensionTestResult with Result == "".
+// SpawnProcessToRunTest must detect this and fall back to newTestResult.
+func TestNewTestResultFromOutput_StdoutPollution(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantResult string
+	}{
+		{
+			name: "unrelated JSON object before actual test result picks up wrong JSON",
+			// First JSON line is an unrelated object (e.g. an API response); extractJSON
+			// picks it up before the real result, yielding Result == "".
+			input: `{"kind":"PodList","apiVersion":"v1","items":[]}` + "\n" +
+				`{"name":"[sig-apps] example test should succeed","result":"passed","duration":10000}` + "\n",
+			wantResult: "", // Result is empty — the unrelated JSON was parsed
+		},
+		{
+			name:       "JSON with explicitly empty result field",
+			input:      `{"name":"some-test","result":"","duration":1000}`,
+			wantResult: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := bytes.NewBufferString(tt.input)
+			result, err := newTestResultFromOutput(buf)
+			if err != nil {
+				t.Fatalf("newTestResultFromOutput() unexpected error: %v", err)
+			}
+			if string(result.Result) != tt.wantResult {
+				t.Errorf("result.Result = %q, want %q", result.Result, tt.wantResult)
+			}
+		})
+	}
+}
+
+// TestNewTestResult_RestoresContextOnPollution verifies that when SpawnProcessToRunTest
+// falls back to newTestResult after detecting an invalid result type, the returned
+// result carries the originally requested test name and the stderr diagnostic, not
+// the name/fields parsed from the polluted JSON.
+func TestNewTestResult_RestoresContextOnPollution(t *testing.T) {
+	requestedName := "[sig-apps] example test should succeed"
+	now := time.Now()
+	stderr := bytes.NewBufferString("subprocess produced invalid result type \"\" for test \"[sig-apps] example test should succeed\"; likely JSON pollution in stdout\n")
+	stdout := bytes.NewBufferString(`{"kind":"PodList","apiVersion":"v1","items":[]}` + "\n")
+
+	result := newTestResult(requestedName, extensiontests.ResultFailed, now, now, stdout, stderr)
+
+	if result.Name != requestedName {
+		t.Errorf("result.Name = %q, want %q", result.Name, requestedName)
+	}
+	if result.Result != extensiontests.ResultFailed {
+		t.Errorf("result.Result = %q, want %q", result.Result, extensiontests.ResultFailed)
+	}
+	if result.Error == "" {
+		t.Error("result.Error is empty; expected stderr diagnostic to be captured in Error field")
 	}
 }

@@ -67,8 +67,16 @@ func SpawnProcessToRunTest(ctx context.Context, testName string, timeout time.Du
 
 	subcommandResult, parseErr := newTestResultFromOutput(stdout)
 	if parseErr == nil {
-		// even if we have a cmdErr, if we were able to parse the result, trust the output
-		return subcommandResult
+		// even if we have a cmdErr, if we were able to parse the result, trust the output.
+		// validate the result type — stdout pollution (e.g. JSON from oc/loki calls) can cause
+		// extractJSON to pick up the wrong JSON, leaving Result as an empty string.
+		switch subcommandResult.Result {
+		case extensiontests.ResultPassed, extensiontests.ResultFailed, extensiontests.ResultSkipped:
+			return subcommandResult
+		default:
+			fmt.Fprintf(stderr, "subprocess produced invalid result type %q for test %q; likely JSON pollution in stdout\n", subcommandResult.Result, testName)
+			return newTestResult(testName, extensiontests.ResultFailed, start, end, stdout, stderr)
+		}
 	}
 
 	fmt.Fprintf(stderr, "Command Error: %v\n", cmdErr)
