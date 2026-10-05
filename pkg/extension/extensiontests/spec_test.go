@@ -1287,6 +1287,40 @@ func TestModuleTestsOnly(t *testing.T) {
 	}
 }
 
+// TestExtensionTestSpecs_Run_UnknownResultNormalized verifies that a blocking in-process
+// test returning an unknown result type (e.g. empty string) is normalized to ResultFailed
+// before failure counting, so run-suite exits non-zero and JUnit is consistent.
+func TestExtensionTestSpecs_Run_UnknownResultNormalized(t *testing.T) {
+	specs := ExtensionTestSpecs{
+		{
+			Name:      "blocking-test-with-unknown-result",
+			Lifecycle: LifecycleBlocking,
+			Run: func(ctx context.Context) *ExtensionTestResult {
+				return &ExtensionTestResult{
+					Name:   "blocking-test-with-unknown-result",
+					Result: Result(""),
+				}
+			},
+		},
+	}
+
+	results, err := specs.Run(context.TODO(), NullResultWriter{}, 1)
+
+	if err == nil {
+		t.Error("expected non-nil error (non-zero exit) for blocking test with unknown result, got nil")
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Result != ResultFailed {
+		t.Errorf("result.Result = %q, want %q", results[0].Result, ResultFailed)
+	}
+	if results[0].Error == "" {
+		t.Error("result.Error is empty; expected diagnostic about unknown result type")
+	}
+}
+
 // equateErrorMessage reports errors to be equal if both are nil
 // or both have the same message.
 var equateErrorMessage = cmp.FilterValues(func(x, y interface{}) bool {

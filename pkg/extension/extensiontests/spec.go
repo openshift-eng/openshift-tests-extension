@@ -628,5 +628,19 @@ func runSpec(ctx context.Context, spec *ExtensionTestSpec, runSingleSpec bool) *
 		res.Duration = duration.Milliseconds()
 	}
 
+	// Normalize unknown result types to ResultFailed so the scheduler's failure
+	// counting and the process exit code stay consistent with JUnit output.
+	// An unknown result (e.g. empty string) would otherwise cause run-suite to
+	// exit 0 while JUnit reports a failure.
+	switch res.Result {
+	case ResultPassed, ResultFailed, ResultSkipped:
+		// valid
+	default:
+		if res.Error == "" {
+			res.Error = fmt.Sprintf("test produced unknown result type %q; normalized to failed", res.Result)
+		}
+		res.Result = ResultFailed
+	}
+
 	return res
 }

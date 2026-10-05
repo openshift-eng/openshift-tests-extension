@@ -3,6 +3,9 @@ package ginkgo
 import (
 	"bytes"
 	"testing"
+	"time"
+
+	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 )
 
 func TestExtractJSON(t *testing.T) {
@@ -288,4 +291,87 @@ func TestNewTestResultFromOutput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestNewTestResultFromOutput_StdoutPollution documents the root cause of the panic:
+// when a subprocess emits an unrelated JSON object to stdout before the actual test
+// result (e.g. an oc or loki API response), extractJSON picks up the wrong JSON first,
+// returning a parsed ExtensionTestResult with Result == "".
+// SpawnProcessToRunTest must detect this and fall back to newTestResult.
+func TestNewTestResultFromOutput_StdoutPollution(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantResult string
+	}{
+		{
+			name: "unrelated JSON object before actual test result picks up wrong JSON",
+			// First JSON line is an unrelated object (e.g. an API response); extractJSON
+			// picks it up before the real result, yielding Result == "".
+			input: `{"kind":"PodList","apiVersion":"v1","items":[]}` + "\n" +
+				`{"name":"[sig-apps] example test should succeed","result":"passed","duration":10000}` + "\n",
+			wantResult: "", // Result is empty — the unrelated JSON was parsed
+		},
+		{
+			name:       "JSON with explicitly empty result field",
+			input:      `{"name":"some-test","result":"","duration":1000}`,
+			wantResult: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := bytes.NewBufferString(tt.input)
+			result, err := newTestResultFromOutput(buf)
+			if err != nil {
+				t.Fatalf("newTestResultFromOutput() unexpected error: %v", err)
+			}
+			if string(result.Result) != tt.wantResult {
+				t.Errorf("result.Result = %q, want %q", result.Result, tt.wantResult)
+			}
+		})
+	}
+}
+
+// TestHandleSubprocessResult exercises the invalid-result branch in handleSubprocessResult,
+// which is the path SpawnProcessToRunTest takes when stdout pollution causes extractJSON to
+// parse the wrong JSON and return Result == "". Verifies the fallback produces a failed
+// result with the correct test name, timing, and diagnostic captured in Error.
+func TestHandleSubprocessResult(t *testing.T) {
+	t.Run("known result types are returned unchanged", func(t *testing.T) {
+		for _, r := range []extensiontests.Result{extensiontests.ResultPassed, extensiontests.ResultFailed, extensiontests.ResultSkipped} {
+			parsed := &extensiontests.ExtensionTestResult{Name: "original-name", Result: r}
+			got := handleSubprocessResult(parsed, "requested-name", time.Time{}, time.Time{}, &bytes.Buffer{}, &bytes.Buffer{})
+			if got != parsed {
+				t.Errorf("result %q: expected same pointer back, got a different result", r)
+			}
+		}
+	})
+
+	t.Run("unknown result falls back with correct name, timing, and diagnostic", func(t *testing.T) {
+		requestedName := "[sig-apps] example test should succeed"
+		start := time.Now().Add(-5 * time.Second)
+		end := time.Now()
+		stdout := bytes.NewBufferString(`{"kind":"PodList","apiVersion":"v1","items":[]}` + "\n")
+		stderr := &bytes.Buffer{}
+
+		parsed := &extensiontests.ExtensionTestResult{Name: "wrong-name-from-polluted-json", Result: extensiontests.Result("")}
+		result := handleSubprocessResult(parsed, requestedName, start, end, stdout, stderr)
+
+		if result.Name != requestedName {
+			t.Errorf("result.Name = %q, want %q", result.Name, requestedName)
+		}
+		if result.Result != extensiontests.ResultFailed {
+			t.Errorf("result.Result = %q, want %q", result.Result, extensiontests.ResultFailed)
+		}
+		if result.Error == "" {
+			t.Error("result.Error is empty; expected stderr diagnostic to be captured")
+		}
+		wantDiag := "invalid result type"
+		if !bytes.Contains([]byte(result.Error), []byte(wantDiag)) {
+			t.Errorf("result.Error = %q, want it to contain %q", result.Error, wantDiag)
+		}
+		if result.StartTime == nil || result.EndTime == nil {
+			t.Error("result.StartTime or EndTime is nil; timing was not preserved")
+		}
+	})
 }
