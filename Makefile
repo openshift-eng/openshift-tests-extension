@@ -8,7 +8,7 @@ LDFLAGS := -X '$(GO_PKG_NAME)/pkg/version.CommitFromGit=$(GIT_COMMIT)' \
            -X '$(GO_PKG_NAME)/pkg/version.BuildDate=$(BUILD_DATE)' \
            -X '$(GO_PKG_NAME)/pkg/version.GitTreeState=$(GIT_TREE_STATE)'
 
-.PHONY: all build verify test lint clean unit integration example-tests framework-tests
+.PHONY: all build verify test lint lint-shared clean unit integration example-tests framework-tests
 
 all: unit build integration
 
@@ -41,8 +41,11 @@ else
 	./framework-tests run-suite openshift-tests-extension/framework
 endif
 
-lint:
+lint: lint-shared
 	./hack/go-lint.sh run ./...
+
+lint-shared:
+	cd test/shared && ../../hack/go-lint.sh run ./...
 
 clean:
 	rm -f example-tests framework-tests
