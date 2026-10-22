@@ -1,0 +1,18 @@
+version: "2"
+linters:
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Ginkgo/Gomega tests conventionally use dot imports.
+      - path: ^test/
+        linters:
+          - staticcheck
+        text: ST1001
+formatters:
+  exclusions:
+    generated: lax

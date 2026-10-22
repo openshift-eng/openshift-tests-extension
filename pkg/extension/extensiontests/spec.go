@@ -126,7 +126,7 @@ func ModuleTestsOnly() SelectFunction {
 			}
 
 			// If this code location is not external (vendored or k8s test), it's local code
-			if !(strings.Contains(cl, "/vendor/") || strings.HasPrefix(cl, "k8s.io/kubernetes")) {
+			if !strings.Contains(cl, "/vendor/") && !strings.HasPrefix(cl, "k8s.io/kubernetes") {
 				hasLocalCode = true
 				break
 			}

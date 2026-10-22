@@ -74,7 +74,7 @@ func (o *OutputFlags) Marshal(v interface{}) ([]byte, error) {
 				}
 
 				// Dereference pointer if needed
-				if item.Kind() == reflect.Ptr {
+				if item.Kind() == reflect.Pointer {
 					item = item.Elem()
 				}
 				// Check for struct with Name field
